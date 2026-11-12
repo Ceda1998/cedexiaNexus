@@ -71,7 +71,7 @@ verlinkten Bootstrap-Dateien angelegt; keine zusätzlichen Pakete oder Modelle.
 | CI-YAML mit Ruby-Standardbibliothek geparst | Gültiges YAML; Jobdefinition vorhanden |
 | `git check-ignore` mit neun Beispielpfaden | Secrets, Modelle, lokale Berichte, Caches und Build-Binärdateien ausgeschlossen |
 | `git diff --cached --check` | Exit 0; vorgemerkte Bootstrap-Dateien ohne Whitespace-Fehler |
-| `len(Path("AGENTS.md").read_text(encoding="utf-8"))` | 3.278 Zeichen, innerhalb des Zielbereichs |
+| `len(Path("AGENTS.md").read_text(encoding="utf-8"))` | Bootstrap: 3.278 Zeichen; nach NX-041: 3.489 Zeichen, jeweils im Zielbereich |
 
 Die Sandbox blockierte die sysctl-Abfragen: Der Bericht gab dort CPU/RAM
 korrekt als `unknown` aus. Die obigen Hardwarewerte stammen aus der ausdrücklich
@@ -85,7 +85,9 @@ Nutzerauftrag wurde `main` initialisiert, das SSH-Remote
 `git@github.com:Ceda1998/cedexiaNexus.git` eingetragen und mit `git ls-remote`
 erreichbar und leer vorgefunden. Der Nutzer hat den ersten Commit und Push
 ausdrücklich beauftragt. Der finale Commit und Git-Status werden im
-Übergabebericht genannt; der Notion-Ticketstatus wird hier nicht geändert.
+Übergabebericht genannt. NX-040 ist in Notion mit den Bootstrap-Nachweisen
+abgeschlossen; Dokumentationspflege, Ticketpflicht und Commitformat werden in
+[NX-041](https://app.notion.com/p/41672966d10d81a39bbdd4c845d09e42) nachgeführt.
 
 Windows-/Linux-Hardware, CUDA, Metal-Ausführung, Modellladen und verteilte
 Inferenz sind durch diese lokalen Tests nicht validiert. Die CI ist für

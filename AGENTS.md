@@ -6,9 +6,16 @@ soll Qwen3.8-27B für Text gemeinsam auf Windows/CUDA und macOS/Metal ausführen
 beide Hosts müssen an derselben Modellberechnung beteiligt sein. Ein Remote-
 Chat ist kein Nachweis. Backend-Kompatibilität und Leistung sind noch offen.
 
-Der aktuelle Stand ist der NX-040-Bootstrap. Halte Änderungen klein und
-reproduzierbar. Neue Inferenzfunktionen gehören in separate Tickets. Nutze
-README.md als Einstieg und docs/prototype.md für Messplan und Abnahmekriterien.
+Fokus: kleine, reproduzierbare Änderungen. Inferenzfunktionen gehören in
+separate Tickets. Einstieg: README.md; Messplan und Abnahme: docs/prototype.md.
+
+## Arbeitsablauf und Commits
+- Notion-Dokumentation stets aktuell halten; nach jeder Implementierung die
+  zugehörigen Tickets mit Status, Änderungen und Testnachweisen aktualisieren.
+- Existiert kein passendes Ticket, vor der Implementierung im Development Board
+  ein Ticket mit konkreten To Dos und Abnahmekriterien anlegen.
+- Commitformat: `CN - Ticketnummer - kurze Beschreibung`, zum Beispiel
+  `CN - NX-041 - Arbeitsregeln ergänzen`.
 
 ## Sicherheitsregeln und Grenzen
 - Keine Modellgewichte automatisch herunterladen, großen Binärdateien oder
@@ -50,12 +57,10 @@ ausführen; CI verwendet `python`. Für diesen Bootstrap gibt es kein separates
 Build. Ein Diagnosebericht bestätigt keine funktionsfähige Inferenz.
 
 ## Definition of Done
-Relevante Tests ausführen und tatsächliche Ergebnisse mit Plattform und Grenzen
-dokumentieren. Änderungen auf Secrets, große Dateien und unbelegte Aussagen
-prüfen. Abschließend Git-Status und Diff kontrollieren. NX-040 erst nach
-überprüfbaren Abnahmekriterien abschließen. Keine Skills oder Platzhalter ohne
-konkreten wiederkehrenden Bedarf; Details in Skripten oder den vorhandenen Docs
-pflegen. Die Projektlizenz ist offen; keine Lizenz eigenmächtig festlegen.
+Tests ausführen; Plattform und Grenzen dokumentieren. Änderungen auf Secrets,
+große Dateien und unbelegte Aussagen prüfen; Git-Status und Diff kontrollieren.
+Tickets erst nach erfüllten Abnahmekriterien abschließen. Keine Skills oder
+Platzhalter ohne konkreten Bedarf. Details in Skripten oder vorhandenen Docs
+pflegen. Die Projektlizenz bleibt offen; keine Lizenz eigenmächtig festlegen.
 
-Postman CLI ist optional unter /Users/cedric.daunke/.local/bin/postman verfügbar.
-Für Diagnose und Tests dieses Repositories wird es nicht benötigt.
+Postman CLI (optional): /Users/cedric.daunke/.local/bin/postman.
