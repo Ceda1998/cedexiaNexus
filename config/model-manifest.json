@@ -16,7 +16,7 @@
     "quantization": "Q4_K_M",
     "size_bytes": 19403684480,
     "sha256": "d15d4b6de55f662ac40e867702d31afe738d032fa06b829b2b1a21a49d4a48ee",
-    "hash_source": "Hugging Face LFS metadata; local weights not downloaded",
+    "hash_source": "Hugging Face LFS metadata",
     "license": "Apache-2.0",
     "architecture": "qwen35"
   },

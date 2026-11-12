@@ -73,7 +73,8 @@ Plattformantworten; das ersetzt keine Ausführung auf der Zielhardware.
 ## Nächste Tickets
 
 NX-002 (Inventur des bestätigten M5-Macs) und NX-004 (Modellmetadaten und
-Integritätsprüfung) sind umgesetzt. Es wurde noch kein Modell heruntergeladen.
+Integritätsprüfung) sind umgesetzt. Das Q4_K_M-Testmodell wurde auf ausdrücklichen
+Nutzerauftrag lokal heruntergeladen und verifiziert; es ist nicht Teil von Git.
 
 1. NX-005: Nativen Metal-Build mit dem festgelegten Runtime-Kandidaten prüfen;
    CMake fehlt auf diesem Mac noch.

@@ -1,9 +1,10 @@
 # NX-004 · Festgelegtes Text-Modellartefakt
 
 Stand 12.11.2026. Maschinenlesbare Quelle: [model-manifest.json](../config/model-manifest.json).
-Die kleine Metadatenabfrage lädt keine Modellgewichte. Der Hash der Gewichte
-stammt aus den veröffentlichten LFS-Metadaten; eine lokale Gewichtsdatei wurde
-noch nicht geprüft oder ausgeführt.
+Die Metadatenabfrage selbst lädt keine Modellgewichte. Der erwartete Hash
+stammt aus den veröffentlichten LFS-Metadaten. Am 12.11.2026 wurde die Datei
+auf ausdrücklichen Nutzerauftrag lokal heruntergeladen und erfolgreich gegen
+Größe und SHA-256 geprüft. Eine Modellausführung ist noch nicht nachgewiesen.
 
 | Feld | Festlegung |
 | --- | --- |
@@ -59,3 +60,18 @@ bedeutet identische Bytes, Exit 1 Abweichung oder ungültige/unlesbare Eingaben.
 Sie lädt nichts herunter, startet keine Runtime und bestätigt keine Inferenz.
 Vier Tests decken mehrere Blöcke, gleich große Beschädigung, abgeschnittene
 Dateien, ungültige Eingaben und CLI-Exitcodes ohne Pfadpreisgabe ab.
+
+## NX-005: lokale Modellbereitstellung vom 12.11.2026
+
+Die oben gepinnte Q4_K_M-Datei wurde über HTTPS aus der festgelegten Revision
+in `models/Qwen3.8-27B-Q4_K_M.gguf.part` geladen. Vor Umbenennung in
+`models/Qwen3.8-27B-Q4_K_M.gguf` prüfte `scripts.verify_model` die gesamte Datei:
+19.403.684.480 Byte, SHA-256 identisch zum Manifest, Exit 0, `verified: true`.
+Der Ordner und die Gewichte bleiben Git-ignoriert und werden nicht verteilt.
+
+Damit ist die Modelldatei für NX-005 bereit. llama.cpp und CMake sind auf diesem
+Mac noch nicht im PATH. Als Nächstes: nativen Metal-Build erstellen, GPU-Gerät
+prüfen und einen kurzen lokalen Terminal-Prompt mit kleinem Kontext ausführen.
+Die 32 GiB Unified Memory sind keine Garantie für ein bestimmtes Kontext- oder
+Leistungsbudget; tatsächlichen Speicherverbrauch beim Laden prüfen. Die
+Desktop-Demo bleibt bis zur separaten Integration eine Simulation.
