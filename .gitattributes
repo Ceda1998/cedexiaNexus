@@ -1,0 +1,2 @@
+# Pinned SVG hashes must remain byte-identical on Windows checkouts.
+nexus_ui/assets/icons/*.svg text eol=lf

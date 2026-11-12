@@ -89,8 +89,8 @@ git diff --check
 
 Qt-Tests laufen offscreen; ohne UI-Abhängigkeit werden ausschließlich diese
 Tests übersprungen. Bootstrap-Tests bleiben unabhängig von Qt.
-Die Plattformmatrix in CI ist konfiguriert, aber ein lokaler Linux-Test ist
-kein Nachweis für Windows oder macOS. Physische Zielgeräte, Screenreader,
+Die Plattformmatrix in CI prüft alle drei Betriebssysteme offscreen.
+Physische Zielgeräte, Screenreader,
 200-%-Textskalierung und High-DPI benötigen manuelle Abnahme. NX-037 erst nach
 diesen Nachweisen abschließen.
 
@@ -105,8 +105,22 @@ Compileall und `git diff --check` erfolgreich. Ein Fontconfig-Cachehinweis der
 Sandbox verhinderte weder Fontladen noch Rendering.
 
 Die folgenden Screenshots stammen aus dem tatsächlichen Qt-Rendering unter
-Linux; sie sind keine Windows-/Mac-Nachweise. Die CI-Erweiterung ist noch
-nicht auf GitHub ausgeführt. Ticketstatus: Review, Plattformabnahme offen.
+Linux; sie sind keine Windows-/Mac-Nachweise. Ticketstatus: Review,
+vollständige Plattformabnahme offen.
+
+Ergänzung vom 12.11.2026: Auf dem physischen Mac (Apple M5, arm64,
+macOS 27.2, Python 3.13.15, PySide6 6.8.3) wurde die Demo als sichtbares
+Cocoa-Fenster gestartet. Satoshi fehlt lokal; die App nutzt die Systemschrift.
+Die vollständige Suite mit den neuen Inventur-/Integritätsprüfungen bestand
+mit 31 Tests, davon 6 Qt-Interaktionstests offscreen. Dies ersetzt keine
+manuelle High-DPI-, Screenreader- oder Windows-Abnahme.
+
+Der erste [CI-Lauf](https://github.com/Ceda1998/cedexiaNexus/actions/runs/43292374820)
+zeigte zwei konkrete Fehler: Windows wandelte SVG-Zeilenenden um und verletzte
+damit die gepinnten Hashes; Linux fehlte `libEGL.so.1`. `.gitattributes` erzwingt
+nun LF für die SVGs, der Linux-Desktopjob installiert `libegl1` und `libopengl0`.
+Die strengen Icon-Hashes bleiben unverändert. Den Nachweis des korrigierten
+Commits liefern die [GitHub Actions](https://github.com/Ceda1998/cedexiaNexus/actions).
 
 ![Übersicht, Qt-Offscreen unter Linux](images/nx-037-overview.png)
 
@@ -125,4 +139,5 @@ Alpha-Plattform fertiggestellt sein. Sichere Live-Anbindung bleibt erforderlich,
 ein eigener REST-Server ist für die Qt-Oberfläche jedoch kein Selbstzweck.
 NX-010 (alternative Runtime) sollte nur bei Bedarf zum Engpass werden;
 die bestehende NX-016-Abhängigkeit ist bei späterer Planung zu überprüfen.
-In diesem Auftrag wurde ausschließlich NX-037 implementiert.
+Diese Desktop-Demo gehört zu NX-037; Inventur und Modellfestlegung sind
+separat in NX-002 und NX-004 dokumentiert.
