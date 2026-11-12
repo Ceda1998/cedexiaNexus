@@ -71,7 +71,7 @@ verlinkten Bootstrap-Dateien angelegt; keine zusätzlichen Pakete oder Modelle.
 | CI-YAML mit Ruby-Standardbibliothek geparst | Gültiges YAML; Jobdefinition vorhanden |
 | `git check-ignore` mit neun Beispielpfaden | Secrets, Modelle, lokale Berichte, Caches und Build-Binärdateien ausgeschlossen |
 | `git diff --cached --check` | Exit 0; vorgemerkte Bootstrap-Dateien ohne Whitespace-Fehler |
-| `len(Path("AGENTS.md").read_text(encoding="utf-8"))` | Bootstrap: 3.278 Zeichen; nach NX-041: 3.489 Zeichen, jeweils im Zielbereich |
+| `len(Path("AGENTS.md").read_text(encoding="utf-8"))` | Bootstrap: 3.278 Zeichen; nach NX-041: 3.488 Zeichen, jeweils im Zielbereich |
 
 Die Sandbox blockierte die sysctl-Abfragen: Der Bericht gab dort CPU/RAM
 korrekt als `unknown` aus. Die obigen Hardwarewerte stammen aus der ausdrücklich
