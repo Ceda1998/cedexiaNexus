@@ -4,7 +4,8 @@ Stand 12.11.2026. Maschinenlesbare Quelle: [model-manifest.json](../config/model
 Die Metadatenabfrage selbst lädt keine Modellgewichte. Der erwartete Hash
 stammt aus den veröffentlichten LFS-Metadaten. Am 12.11.2026 wurde die Datei
 auf ausdrücklichen Nutzerauftrag lokal heruntergeladen und erfolgreich gegen
-Größe und SHA-256 geprüft. Eine Modellausführung ist noch nicht nachgewiesen.
+Größe und SHA-256 geprüft. Native Metal-Textgenerierung wurde anschließend in
+[NX-005](mac-metal.md) auf dem M5-Mac nachgewiesen.
 
 | Feld | Festlegung |
 | --- | --- |
@@ -38,9 +39,9 @@ Runtime-Kandidat: llama.cpp-Commit
 [`8ca5a8008b57aa39f2601546c0d07912045080a5`](https://github.com/ggml-org/llama.cpp/commit/8ca5a8008b57aa39f2601546c0d07912045080a5).
 Erforderlich sind GGUF-Architektur `qwen35`, Q4_K_M, eingebetteter Tokenizer,
 Jinja-Verarbeitung und funktionierende native Metal-/CUDA-Backends. Dieser
-Commit ist eine reproduzierbare Ausgangsbasis, **noch keine validierte
-Kompatibilitätszusage**. NX-005/006 müssen denselben Commit bauen und die
-Backend-Fähigkeiten nachweisen; nötige Revisionänderungen im Manifest begründen.
+Commit ist für einen kurzen Metal-Textlauf in NX-005 validiert. CUDA muss
+NX-006 mit demselben Commit praktisch prüfen; nötige Revisionänderungen im
+Manifest begründen. Eine plattformübergreifende Kompatibilitätszusage fehlt.
 Cross-Backend-RPC bleibt separat in NX-009 zu prüfen.
 
 19,4 GB Dateigröße sind kein Laufzeit-Speicherbedarf. Runtime, KV-Cache und OS
@@ -69,9 +70,8 @@ in `models/Qwen3.8-27B-Q4_K_M.gguf.part` geladen. Vor Umbenennung in
 19.403.684.480 Byte, SHA-256 identisch zum Manifest, Exit 0, `verified: true`.
 Der Ordner und die Gewichte bleiben Git-ignoriert und werden nicht verteilt.
 
-Damit ist die Modelldatei für NX-005 bereit. llama.cpp und CMake sind auf diesem
-Mac noch nicht im PATH. Als Nächstes: nativen Metal-Build erstellen, GPU-Gerät
-prüfen und einen kurzen lokalen Terminal-Prompt mit kleinem Kontext ausführen.
+Die Modelldatei wurde anschließend mit dem lokalen Metal-Build ausgeführt.
+CMake liegt in `.venv`, die Runtime unter `local/build/llama-metal`.
 Die 32 GiB Unified Memory sind keine Garantie für ein bestimmtes Kontext- oder
 Leistungsbudget; tatsächlichen Speicherverbrauch beim Laden prüfen. Die
 Desktop-Demo bleibt bis zur separaten Integration eine Simulation.

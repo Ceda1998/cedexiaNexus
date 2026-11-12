@@ -20,8 +20,9 @@ Hostnamen, IP-/MAC-Adressen oder Rohlogs. Fehlgeschlagene Abfragen ergeben
 Adapterpräsenz bestätigt weder angeschlossene Kabel noch Linkrate oder
 Erreichbarkeit des Windows-PCs. Diese Messungen gehören zu NX-003.
 Ein gefundener Compiler bestätigt keinen erfolgreichen Build und keine
-Metal-Inferenz. CMake muss für NX-005 noch bereitgestellt werden; Ninja ist
-eine mögliche Build-Werkzeugwahl, kein zwingendes Inferenzmerkmal.
+Metal-Inferenz. Nach dieser Inventur wurde CMake 3.31.6 lokal in `.venv`
+bereitgestellt und ein nativer Metal-Lauf in [NX-005](mac-metal.md) nachgewiesen.
+Ninja wird für den getesteten Makefile-Build nicht benötigt.
 
 **Bestätigtes Zielgerät:** Der Nutzer hat am 12.11.2026 ausdrücklich diesen
 M5-Mac als Zielgerät bestätigt. Die frühere Annahme M5 Pro ist damit korrigiert.

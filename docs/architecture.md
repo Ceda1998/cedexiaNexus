@@ -16,8 +16,10 @@ Inferenzanbindung. `scripts/doctor.py` bleibt unabhängig; ein späterer Adapter
 muss echte Diagnose asynchron ausführen. Start, Assets und Lizenzgrenzen:
 [desktop.md](desktop.md). Windows-/Mac-Abnahme des Toolkit-Spikes bleibt offen.
 
-Es existieren noch keine Inferenz-Laufzeitkomponenten. Die folgende Richtung ist ein
-Versuchsplan, keine implementierte Architektur:
+NX-005 ergänzt einen lokal gebauten llama.cpp-Terminaltest mit nachgewiesener
+Metal-Textgenerierung auf dem M5. Start und Grenzen: [mac-metal.md](mac-metal.md).
+Eine integrierte Nexus-Inferenzsteuerung fehlt. Die folgende verteilte Richtung
+ist ein Versuchsplan, keine implementierte Architektur:
 
 | Rolle | Verantwortung im späteren Versuch | Status |
 | --- | --- | --- |
@@ -33,8 +35,9 @@ eines Servers; Sicherheitsgrenzen stehen in [security.md](security.md).
 
 ## Offene Entscheidungen
 
-- Gemeinsamen llama.cpp-Commit sowie unterstützte Modell-/GGUF-Version pinnen.
-- Windows-Treiber, CUDA-Toolchain und Apple-Metal-Pfad praktisch prüfen.
+- Gepinnten llama.cpp-/GGUF-Stand aus NX-004/005 auch unter Windows prüfen.
+- Windows-Treiber und CUDA-Toolchain praktisch prüfen; den nachgewiesenen
+  kurzen Apple-Metal-Lauf in NX-007 zur reproduzierbaren Baseline erweitern.
 - Koordinator, lokale/entfernte Device-Zuweisung und Layer-Verteilung bestimmen.
 - KV-Cache, Kontext, RAM-/VRAM-Reserve und Abbruch-/Timeout-Verhalten messen.
 - Nachweisen, dass beide Hosts rechnen; aggregierter RAM ist kein gemeinsamer

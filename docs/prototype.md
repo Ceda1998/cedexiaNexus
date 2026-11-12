@@ -54,7 +54,8 @@ Seed und Sampling-Parameter verwenden, soweit unterstützt. Pro Szenario nach
 Warm-up mindestens drei Messungen; Median und Fehler ausweisen. Erfassen:
 Runtime-Commit, Modellhash, Device-/Layer-Verteilung, Eingabe-/Ausgabe-Tokenzahl,
 TTFT, Prefill-/Decode-Token/s, Peak-RAM/VRAM, LAN-Bytes und Fehler. Backendbedingte
-Abweichungen offen dokumentieren. Es liegen noch keine Inferenzmesswerte vor.
+Abweichungen offen dokumentieren. NX-005 liefert [kurze Metal-Funktionsläufe](mac-metal.md)
+mit GPU-Layer-Zuordnung; standardisierte Baseline-Messreihen fehlen weiterhin.
 
 ## NX-040: lokaler Testnachweis
 

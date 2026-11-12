@@ -15,9 +15,15 @@ Lokale UI-Tests unter Linux/macOS bestanden; sichtbarer Mac-Start bestätigt.
 Vollständige Windows-/Mac-Abnahme (u. a. High-DPI) bleibt offen.
 Hardwarediagnose und Inferenz sind noch nicht mit der UI verbunden.
 
+NX-005: Qwen3.8-27B Q4_K_M generiert lokal auf dem bestätigten M5-Mac Text mit
+Metal (65/65 Layer auf GPU). [Start und Nachweis](docs/mac-metal.md):
+`sh scripts/run_mac_model.sh "Deine kurze Frage"`. Dies ist ein begrenzter
+Terminal-Test; CUDA und gemeinsame Inferenz bleiben ungeprüft.
+
 NX-040 stellt die Repository-Grundlage bereit: Dokumentation, lokale Diagnose,
-Unit-Tests und GPU-unabhängige CI. Es gibt noch keine Inferenz-Engine, keinen
-Server und keinen nachgewiesenen CUDA-/Metal-Verbund. Ein erfolgreicher
+Unit-Tests und GPU-unabhängige CI. Der lokale llama.cpp-Test ist noch nicht in
+Nexus integriert; es gibt keinen Server und keinen nachgewiesenen
+CUDA-/Metal-Verbund. Ein erfolgreicher
 Hardwarecheck bestätigt keine Backend- oder Modellkompatibilität.
 
 ## Installation und lokale Prüfung
@@ -76,13 +82,13 @@ NX-002 (Inventur des bestätigten M5-Macs) und NX-004 (Modellmetadaten und
 Integritätsprüfung) sind umgesetzt. Das Q4_K_M-Testmodell wurde auf ausdrücklichen
 Nutzerauftrag lokal heruntergeladen und verifiziert; es ist nicht Teil von Git.
 
-1. NX-005: Nativen Metal-Build mit dem festgelegten Runtime-Kandidaten prüfen;
-   CMake fehlt auf diesem Mac noch.
+1. NX-007: Reproduzierbare Mac-Solo-Baseline auf dem in NX-005 geprüften
+   Metal-Build messen; bisher nur kurze Funktionstests.
 2. NX-001: Windows-PC, genaue CPU, RAM, Treiber und CUDA-Werkzeuge inventarisieren;
    anschließend NX-006 für den nativen CUDA-Build.
 3. NX-003: Tatsächliche LAN-Latenz und Bandbreite zwischen beiden Geräten messen.
-4. NX-007/008: Erst mit separat bereitgestellter, lokal verifizierter Modelldatei
-   die Einzelhost-Baselines messen; danach NX-009 und NX-011/012.
+4. NX-008: Nach NX-006 die Windows-Solo-Baseline messen; danach NX-009 und
+   NX-011/012 für den gemeinsamen Rechennachweis.
 
 ## Grenzen und Lizenz
 

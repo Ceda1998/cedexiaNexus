@@ -25,6 +25,11 @@
     "candidate_revision": "8ca5a8008b57aa39f2601546c0d07912045080a5",
     "required_backends": ["Metal", "CUDA"],
     "required_features": ["qwen35", "Q4_K_M", "embedded GGUF tokenizer", "Jinja chat template"],
-    "inference_validated": false
+    "validation": {
+      "macos_metal_text_smoke": true,
+      "windows_cuda": false,
+      "dual_host": false,
+      "evidence": "docs/mac-metal.md"
+    }
   }
 }

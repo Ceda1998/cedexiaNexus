@@ -46,6 +46,8 @@ und Versionsmanifest ausliefern.
 - .github/workflows/ci.yml: Tests ohne GPU, Modelle oder zusätzliche Pakete.
 - docs/architecture.md: technische Richtung und offene Entscheidungen.
 - docs/prototype.md: Hardwareannahmen, Testreihenfolge und Testnachweis.
+- docs/mac-metal.md: geprüfter lokaler Metal-Build und Grenzen aus NX-005;
+  `sh scripts/run_mac_model.sh` startet einen begrenzten Offline-Terminaltest.
 
 ## Ausführen und prüfen
 Voraussetzung: Python >= 3.11 und Git. Keine Paketinstallation erforderlich.
