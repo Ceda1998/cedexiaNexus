@@ -9,6 +9,12 @@ Chat ist kein Nachweis. Backend-Kompatibilität und Leistung sind noch offen.
 Fokus: kleine, reproduzierbare Änderungen. Inferenzfunktionen gehören in
 separate Tickets. Einstieg: README.md; Messplan und Abnahme: docs/prototype.md.
 
+NX-037 ergänzt auf Nutzerauftrag eine frühe Offline-Desktop-Demo. UI-Code liegt
+in nexus_ui/, Start und Lizenzhinweise in docs/desktop.md. Simulierte Daten
+stets markieren; keine Live-Funktionen aus einer Demo ableiten. Satoshi-Dateien
+nur lokal installieren und nicht über Git verteilen. Tabler-SVGs samt MIT-Lizenz
+und Versionsmanifest ausliefern.
+
 ## Arbeitsablauf und Commits
 - Notion-Dokumentation stets aktuell halten; nach jeder Implementierung die
   zugehörigen Tickets mit Status, Änderungen und Testnachweisen aktualisieren.
@@ -43,12 +49,14 @@ separate Tickets. Einstieg: README.md; Messplan und Abnahme: docs/prototype.md.
 
 ## Ausführen und prüfen
 Voraussetzung: Python >= 3.11 und Git. Keine Paketinstallation erforderlich.
+Dies gilt für die Bootstrap-Diagnose. Für UI-Arbeit requirements-ui.txt in einer
+lokalen virtuellen Umgebung installieren und Qt-Interaktionstests mit ausführen.
 Im Repository-Root unter macOS:
 
 ```sh
 python3 scripts/doctor.py
 python3 -m unittest discover -s tests -v
-python3 -m compileall -q scripts tests
+python3 -m compileall -q scripts tests nexus_ui
 git diff --check
 ```
 

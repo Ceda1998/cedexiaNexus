@@ -1,0 +1,14 @@
+{
+  "source": "https://raw.githubusercontent.com/tabler/tabler-icons/147130cd0e67a9cfc70538f8b3a14a48a695d90b/",
+  "version": "v3.35.0",
+  "sha256": {
+    "layout-dashboard.svg": "0664c70d5eb6bf3d4f9d7f9662f7e567b2c8a738ab6c4cc077e84301d5ee8335",
+    "checklist.svg": "3191a06f0e579897608a84ef76c2579190ef9c3a3c550773d6fb96075e56d3f6",
+    "devices.svg": "864f112928418591ebdc73ebf360e1b00d9bd00bbb0b0b554b4ac7501040fb05",
+    "message.svg": "229cd83444cf36cd13057e479e46bf1ed7ec0bc2c4f8aea5a8a63f0c91af2c6b",
+    "player-play.svg": "9c30092ecfea4578ecf2669269ce4334a24d82667e61fabba7f6c552447d1c77",
+    "player-stop.svg": "19c9bcbec8fd318c9abae0bab6d9d73bd7df8e15b52fc62b329faf9a1281e4e7",
+    "settings.svg": "98f10cef0571a9bbaf954c8a5d368107c247215fad68bc62a6b2c7dfc0e29642",
+    "alert-triangle.svg": "831c9ac434a14b8e8855775810cd971cff0457330010a4c3c81f74233dbee5ff"
+  }
+}

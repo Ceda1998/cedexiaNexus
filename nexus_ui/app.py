@@ -1,0 +1,340 @@
+"""An explicitly simulated UI. No networking, hardware probes or inference."""
+from pathlib import Path
+import sys
+
+from PySide6.QtCore import Qt, QTimer, QSize
+from PySide6.QtGui import QFont, QFontDatabase, QIcon, QPixmap, QPainter
+from PySide6.QtSvg import QSvgRenderer
+from PySide6.QtWidgets import (
+    QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel,
+    QPushButton, QStackedWidget, QScrollArea, QFrame, QComboBox,
+    QPlainTextEdit, QSpinBox, QMessageBox,
+)
+
+ASSETS = Path(__file__).parent / "assets"
+STYLE = """
+QWidget { color: #162033; background: #F5F6F8; }
+QLabel { background: transparent; }
+QFrame#panel { background: white; border: 1px solid #D8DEE8; }
+QLabel#title { font-size: 28px; font-weight: 700; }
+QLabel#subtitle { color: #526075; }
+QLabel#banner { background: #EAF0F8; color: #173B70; padding: 12px; }
+QPushButton { min-height: 28px; padding: 8px 16px; border: 1px solid #8B9DB5;
+ background: white; color: #173B70; border-radius: 0px; }
+QPushButton:hover { background: #EAF0F8; }
+QPushButton:checked { background: #EAF0F8; border-left: 3px solid #173B70; }
+QPushButton[primary="true"] { background: #173B70; color: white; }
+QPushButton[primary="true"]:hover { background: #102C55; }
+QPushButton:disabled { background: #EEF0F3; color: #626D7D; border-color: #C8CED8; }
+QPushButton:focus, QComboBox:focus, QPlainTextEdit:focus, QSpinBox:focus {
+ border: 2px solid #173B70; }
+QComboBox, QSpinBox { background: white; padding: 8px; min-height: 28px;
+ border: 1px solid #8B9DB5; border-radius: 0px; }
+QPlainTextEdit { background: white; border: 1px solid #8B9DB5; padding: 12px; }
+"""
+
+
+def icon(name, color="#173B70"):
+    """Render the pinned SVG locally with an explicit Qt-compatible color."""
+    data = (ASSETS / "icons" / f"{name}.svg").read_bytes()
+    renderer = QSvgRenderer(data.replace(b"currentColor", color.encode()))
+    result = QIcon()
+    for size in (20, 40, 60):
+        pixmap = QPixmap(size, size)
+        pixmap.fill(Qt.GlobalColor.transparent)
+        painter = QPainter(pixmap)
+        renderer.render(painter)
+        painter.end()
+        result.addPixmap(pixmap)
+    return result
+
+
+def label(text, role=None):
+    widget = QLabel(text)
+    widget.setWordWrap(True)
+    widget.setTextFormat(Qt.TextFormat.PlainText)
+    if role:
+        widget.setObjectName(role)
+    return widget
+
+
+def button(text, callback, name=None, primary=False):
+    widget = QPushButton(text)
+    widget.setProperty("primary", primary)
+    widget.setAccessibleName(text)
+    if name:
+        widget.setIcon(icon(name, "#FFFFFF" if primary else "#173B70"))
+        widget.setIconSize(QSize(20, 20))
+    widget.clicked.connect(callback)
+    return widget
+
+
+class NexusWindow(QMainWindow):
+    def __init__(self):
+        super().__init__()
+        self.setWindowTitle("Cedexia Nexus · Desktop-Demo")
+        self.resize(1200, 850)
+        self.setMinimumSize(800, 600)
+        self.checked = False
+        self.paired = False
+        self.model_ready = False
+        self.running = False
+        self.step = 0
+        self.timer = QTimer(self)
+        self.timer.setInterval(500)
+        self.timer.timeout.connect(self.tick)
+        root = QWidget()
+        self.setCentralWidget(root)
+        layout = QVBoxLayout(root)
+        layout.setContentsMargins(24, 20, 24, 20)
+        layout.setSpacing(16)
+        layout.addWidget(label("CEDEXIA NEXUS", "title"))
+        layout.addWidget(label("DEMO · Beispieldaten · Keine Verbindung und keine Modellberechnung", "banner"))
+        self.font_notice = label("", "subtitle")
+        layout.addWidget(self.font_notice)
+        body = QHBoxLayout()
+        layout.addLayout(body, 1)
+        navigation = QVBoxLayout()
+        body.addLayout(navigation)
+        self.stack = QStackedWidget()
+        body.addWidget(self.stack, 1)
+        self.nav = []
+        for i, (title, name) in enumerate([
+            ("Übersicht", "layout-dashboard"), ("Einrichtung", "checklist"),
+            ("Geräte", "devices"), ("Sitzung", "message"), ("Über Nexus", "settings"),
+        ]):
+            nav = button(title, lambda checked=False, index=i: self.navigate(index), name)
+            nav.setCheckable(True)
+            navigation.addWidget(nav)
+            self.nav.append(nav)
+        navigation.addStretch()
+        self.overview()
+        self.setup()
+        self.devices()
+        self.session()
+        self.about()
+        self.navigate(0)
+        self.refresh()
+
+    def page(self, title, subtitle):
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.Shape.NoFrame)
+        content = QWidget()
+        layout = QVBoxLayout(content)
+        layout.setContentsMargins(24, 8, 12, 16)
+        layout.setSpacing(16)
+        layout.addWidget(label(title, "title"))
+        layout.addWidget(label(subtitle, "subtitle"))
+        scroll.setWidget(content)
+        self.stack.addWidget(scroll)
+        return layout
+
+    def panel(self, layout, title, text):
+        frame = QFrame()
+        frame.setObjectName("panel")
+        inner = QVBoxLayout(frame)
+        inner.setContentsMargins(24, 20, 24, 20)
+        heading = label(title)
+        heading.setFont(QFont(self.font().family(), 15, QFont.Weight.Bold))
+        inner.addWidget(heading)
+        value = label(text)
+        inner.addWidget(value)
+        layout.addWidget(frame)
+        return value
+
+    def overview(self):
+        layout = self.page("Rechenleistung verbinden.", "Zwei Geräte. Eine lokale KI-Sitzung — als Ablaufvorschau.")
+        self.summary = self.panel(layout, "Dein Arbeitsbereich", "")
+        self.panel(layout, "Gemeinsame Berechnung", "Nicht belegt. Diese Demo verwendet keine Inferenz-Engine.")
+        layout.addWidget(button("Einrichtung öffnen", lambda: self.navigate(1), "checklist", True))
+        layout.addStretch()
+
+    def setup(self):
+        layout = self.page("In wenigen Schritten bereit.", "Alle folgenden Aktionen verändern ausschließlich den Demo-Zustand.")
+        self.setup_status = self.panel(layout, "01 / Dieses Gerät", "Noch nicht geprüft")
+        layout.addWidget(button("Geräteprüfung simulieren", self.check_device, "checklist", True))
+        self.model_status = self.panel(layout, "02 / Modell", "Kein Demo-Modell vorbereitet")
+        layout.addWidget(button("Modellprüfung simulieren", self.prepare_model, "checklist"))
+        layout.addWidget(button("03 / Zweites Gerät ansehen", lambda: self.navigate(2), "devices"))
+        layout.addWidget(button("04 / Zur Sitzung", lambda: self.navigate(3), "message"))
+        layout.addStretch()
+
+    def devices(self):
+        layout = self.page("Deine Geräte.", "Beispielprofile. RAM, VRAM und Unified Memory werden getrennt betrachtet.")
+        self.panel(layout, "Mac · Beispielprofil", "32 GiB Unified Memory · Freier Speicher nicht ermittelt\nMetal nicht getestet · M5/M5 Pro noch zu klären")
+        self.peer_status = self.panel(layout, "Windows-PC · Beispielprofil", "")
+        layout.addWidget(button("Freigabe auf beiden Geräten simulieren", self.pair_peer, "devices"))
+        layout.addWidget(button("Zweites Gerät trennen (Demo)", self.disconnect_peer, "devices"))
+        self.limit = QSpinBox()
+        self.limit.setRange(1, 24)
+        self.limit.setValue(16)
+        self.limit.setSuffix(" GiB")
+        caption = label("Geplantes RAM-Limit für Windows (Demo, nicht wirksam)")
+        caption.setBuddy(self.limit)
+        self.limit.setAccessibleName("Geplantes RAM-Limit, nur Demo")
+        layout.addWidget(caption)
+        layout.addWidget(self.limit)
+        layout.addWidget(label("Das Limit wird nur in dieser Sitzung angezeigt. Eine Durchsetzung im Backend ist nicht implementiert.", "subtitle"))
+        layout.addStretch()
+
+    def session(self):
+        layout = self.page("Eine Aufgabe. Dein Cluster.", "Eine feste Beispielausgabe zeigt den Ablauf. Deine Eingabe wird weder verarbeitet noch gespeichert.")
+        self.mode = QComboBox()
+        self.mode.addItems(["Dieses Gerät · Demo", "Zwei Geräte · Demo"])
+        self.mode.currentIndexChanged.connect(self.mode_changed)
+        mode_label = label("Ausführungsmodus")
+        mode_label.setBuddy(self.mode)
+        layout.addWidget(mode_label)
+        layout.addWidget(self.mode)
+        self.session_status = label("", "banner")
+        layout.addWidget(self.session_status)
+        self.prompt = QPlainTextEdit()
+        self.prompt.setPlaceholderText("Beispiel: Erkläre verteilte Inferenz.")
+        self.prompt.setMinimumHeight(100)
+        self.prompt.setMaximumHeight(160)
+        self.prompt.setAccessibleName("Nachricht für die Demo; wird nicht verarbeitet")
+        self.prompt.textChanged.connect(self.refresh)
+        layout.addWidget(self.prompt)
+        actions = QHBoxLayout()
+        self.start = button("Demo-Sitzung starten", self.start_session, "player-play", True)
+        self.stop = button("Sitzung stoppen", self.stop_session, "player-stop")
+        actions.addWidget(self.start)
+        actions.addWidget(self.stop)
+        layout.addLayout(actions)
+        self.output = QPlainTextEdit()
+        self.output.setReadOnly(True)
+        self.output.setAccessibleName("Simulierter Sitzungsverlauf")
+        self.output.setMinimumHeight(150)
+        layout.addWidget(self.output)
+        self.error_button = button("Speicherfehler simulieren", self.fail_session, "alert-triangle")
+        layout.addWidget(self.error_button)
+        layout.addWidget(label("TTFT: Nicht gemessen · Tokens/s: Nicht gemessen · Beteiligung beider Geräte: Nicht nachgewiesen", "subtitle"))
+
+    def about(self):
+        layout = self.page("Über Nexus.", "NX-037 · Offline-Interaktionsprototyp")
+        self.panel(layout, "Darstellung", "Dunkelblau #173B70 · Eckige Komponenten · Satoshi lokal\nTabler Icons Outline v3.35.0 · MIT")
+        layout.addWidget(button("Tabler-Lizenz anzeigen", self.show_license, "settings"))
+        self.panel(layout, "Daten", "Nur flüchtiger Demo-Zustand im Arbeitsspeicher. Kein Netzwerk, keine Modellgewichte und kein automatisches Speichern.")
+        layout.addStretch()
+
+    def show_license(self):
+        dialog = QMessageBox(self)
+        dialog.setWindowTitle("Tabler Icons · MIT-Lizenz")
+        dialog.setText("Tabler Icons — Copyright und Lizenz")
+        dialog.setDetailedText((ASSETS / "icons" / "LICENSE").read_text())
+        dialog.exec()
+
+    def navigate(self, index):
+        self.stack.setCurrentIndex(index)
+        for i, nav in enumerate(self.nav):
+            nav.setChecked(index == i)
+
+    def check_device(self):
+        self.checked = True
+        self.refresh()
+
+    def prepare_model(self):
+        self.model_ready = True
+        self.refresh()
+
+    def pair_peer(self):
+        self.paired = True
+        self.refresh()
+
+    def disconnect_peer(self):
+        self.paired = False
+        if self.running and self.mode.currentIndex() == 1:
+            self.finish("Fehler (simuliert): Zweites Gerät getrennt. Erneut freigeben und Sitzung manuell starten.")
+        self.refresh()
+
+    def mode_changed(self):
+        self.refresh()
+
+    def blockers(self):
+        missing = []
+        if not self.checked:
+            missing.append("Geräteprüfung simulieren")
+        if not self.model_ready:
+            missing.append("Modellprüfung simulieren")
+        if self.mode.currentIndex() == 1 and not self.paired:
+            missing.append("zweites Gerät in der Demo freigeben")
+        if not self.prompt.toPlainText().strip():
+            missing.append("eine Nachricht eingeben")
+        return missing
+
+    def refresh(self):
+        self.summary.setText(f"Geräteprüfung: {'simuliert' if self.checked else 'ausstehend'}\n"
+                             f"Zweites Gerät: {'Freigabe simuliert' if self.paired else 'nicht freigegeben'}\n"
+                             f"Modell: {'Prüfung simuliert' if self.model_ready else 'nicht vorbereitet'}")
+        self.setup_status.setText("Prüfung simuliert. Keine realen Hardwarewerte erhoben." if self.checked else "Noch nicht geprüft")
+        self.model_status.setText("Demo-Modell vorbereitet. Keine Datei geladen oder geprüft." if self.model_ready else "Kein Demo-Modell vorbereitet")
+        self.peer_status.setText("32 GiB RAM / 16 GiB VRAM · CUDA nicht getestet\n" +
+                                 ("Freigabe simuliert" if self.paired else "Nicht freigegeben"))
+        missing = self.blockers()
+        self.start.setEnabled(not missing and not self.running)
+        self.stop.setEnabled(self.running)
+        self.error_button.setEnabled(self.running)
+        self.mode.setEnabled(not self.running)
+        self.prompt.setReadOnly(self.running)
+        self.session_status.setText("Demo läuft · feste Beispielausgabe" if self.running else
+                                    ("Zum Start: " + "; ".join(missing) if missing else "Bereit für eine simulierte Sitzung"))
+
+    def start_session(self):
+        if self.running or self.blockers():
+            return
+        self.running = True
+        self.step = 0
+        self.output.setPlainText("DEMO — keine Modellantwort.\nSitzung wird vorbereitet …")
+        self.timer.start()
+        self.refresh()
+
+    def tick(self):
+        lines = ["Beispiel: Ein lokales Modell kann Rechenschritte auf mehrere Geräte verteilen.",
+                 "Dafür müssen Backend, Modell und Verbindung zusammenpassen.",
+                 "Diese UI simuliert nur den Ablauf; sie berechnet keine Antwort."]
+        if self.step < len(lines):
+            self.output.appendPlainText(lines[self.step])
+            self.step += 1
+        else:
+            self.finish("Demo abgeschlossen. Keine Inferenzmesswerte vorhanden.")
+
+    def finish(self, message):
+        self.timer.stop()
+        self.running = False
+        self.output.appendPlainText(message)
+        self.refresh()
+
+    def stop_session(self):
+        if self.running:
+            self.finish("Demo gestoppt. Eingabe bleibt für einen manuellen Neustart erhalten.")
+
+    def fail_session(self):
+        if self.running:
+            self.finish("Fehler (simuliert): Speicher reicht nicht. Modell oder Ressourcenbudget prüfen und manuell erneut starten.")
+
+    def closeEvent(self, event):
+        self.timer.stop()
+        super().closeEvent(event)
+
+
+def make_application():
+    app = QApplication.instance() or QApplication(sys.argv)
+    loaded = []
+    for path in sorted((ASSETS / "fonts").glob("Satoshi-*.otf")):
+        font_id = QFontDatabase.addApplicationFont(str(path))
+        if font_id >= 0:
+            loaded.extend(QFontDatabase.applicationFontFamilies(font_id))
+    if loaded:
+        app.setFont(QFont(loaded[0], 11))
+    app.setStyleSheet(STYLE)
+    return app, bool(loaded)
+
+
+def main():
+    app, font_loaded = make_application()
+    window = NexusWindow()
+    if not font_loaded:
+        window.font_notice.setText("Satoshi fehlt · Systemschrift aktiv. Einrichtung siehe docs/desktop.md.")
+    window.show()
+    sys.exit(app.exec())

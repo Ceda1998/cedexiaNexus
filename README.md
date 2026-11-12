@@ -7,6 +7,13 @@ Beide Hosts müssen an derselben Modellberechnung beteiligt sein.
 
 ## Status
 
+NX-037 ergänzt eine **Offline-Desktop-Demo** mit PySide6: Übersicht, Einrichtung,
+Geräte, Ressourcenentwurf und simulierter Sitzungsablauf. Dunkelblau, eckige
+Komponenten, lokal installierte Satoshi und Tabler-Outline-SVGs.
+[Start für Windows/macOS, Schriftinstallation und Grenzen](docs/desktop.md).
+Lokale UI-Tests unter Linux bestanden; physische Windows-/Mac-Abnahme offen.
+Hardwarediagnose und Inferenz sind noch nicht mit der UI verbunden.
+
 NX-040 stellt die Repository-Grundlage bereit: Dokumentation, lokale Diagnose,
 Unit-Tests und GPU-unabhängige CI. Es gibt noch keine Inferenz-Engine, keinen
 Server und keinen nachgewiesenen CUDA-/Metal-Verbund. Ein erfolgreicher

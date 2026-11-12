@@ -31,6 +31,8 @@ weights/
 __pycache__/
 *.py[cod]
 .venv/
+# Satoshi is obtained individually from Fontshare, not redistributed in Git.
+nexus_ui/assets/fonts/*.otf
 venv/
 .pytest_cache/
 .mypy_cache/

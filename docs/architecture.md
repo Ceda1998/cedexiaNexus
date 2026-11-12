@@ -9,7 +9,14 @@ Zeitlimits ab und gibt einen kleinen JSON-Bericht aus. Fehlende Werkzeuge oder
 Probe-Fehler werden zu `unknown`; Rohfehler und Werkzeugpfade werden verworfen.
 Unit-Tests simulieren auch fehlende Programme und unvollständige Antworten.
 
-Es existieren noch keine Laufzeitkomponenten. Die folgende Richtung ist ein
+Die Offline-UI aus NX-037 verwendet Python/PySide6 als ersten Desktop-Spike.
+Sie hält ausschließlich Demo-Zustand im Arbeitsspeicher und verwendet einen
+Qt-Timer für fest vorgegebene Beispielausgabe. Es gibt keine Netzwerk- oder
+Inferenzanbindung. `scripts/doctor.py` bleibt unabhängig; ein späterer Adapter
+muss echte Diagnose asynchron ausführen. Start, Assets und Lizenzgrenzen:
+[desktop.md](desktop.md). Windows-/Mac-Abnahme des Toolkit-Spikes bleibt offen.
+
+Es existieren noch keine Inferenz-Laufzeitkomponenten. Die folgende Richtung ist ein
 Versuchsplan, keine implementierte Architektur:
 
 | Rolle | Verantwortung im späteren Versuch | Status |
@@ -35,6 +42,7 @@ eines Servers; Sicherheitsgrenzen stehen in [security.md](security.md).
 - RPC-Kompatibilität zwischen CUDA und Metal sowie nötige Absicherung bewerten.
 - Projektlizenz separat entscheiden; bisher wurde keine Lizenz erteilt.
 
-GUI, Datenbank, Scheduler, öffentlicher P2P-Betrieb, produktiver API-Server,
+Die frühe GUI-Demo ist die ausdrücklich beauftragte Ausnahme zum Bootstrap.
+Datenbank, Scheduler, öffentlicher P2P-Betrieb, produktiver API-Server,
 Docker-Orchestrierung und eigene Distributed-Inference-Engine sind außerhalb
 dieses Bootstraps. Messabfolge und Exit-Kriterien: [prototype.md](prototype.md).
