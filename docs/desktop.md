@@ -1,10 +1,54 @@
-# NX-037 · Desktop-Demo
+# Desktop-Prototyp · NX-037 Demo / NX-042 lokales Modell
 
-Die frühe UI verwendet Python/PySide6 und läuft vollständig offline. Alle
-Gerätewerte, Kopplungen und Sitzungen sind ausdrücklich simuliert. Es gibt
-keine Modellberechnung, keine Hardwarediagnose, keine Netzwerkverbindung und
-keine persistenten Nutzereingaben. Lokale Diagnose und Live-Anbindung bleiben
-die im Ticket benannten Folgeschritte.
+Die UI verwendet Python/PySide6 und läuft ohne Netzwerkverbindung. Übersicht,
+Einrichtung, Geräte und Demo-Sitzung sind ausdrücklich simuliert. Die getrennte
+Ansicht **Lokales Modell** aus NX-042 führt echte Textinferenz auf dem Mac aus.
+Es gibt keine persistierten Nutzereingaben und keine Hardwarediagnose,
+Windows-Inferenz oder Dual-Host-Anbindung.
+
+## Lokales Modell in der UI testen
+
+Auf dem in NX-005 eingerichteten Mac `.venv/bin/python -m nexus_ui` starten.
+Die App öffnet „Lokales Modell“. Eine kurze Frage eingeben und **Lokal starten**
+wählen. Die Datei wird vor jedem Lauf vollständig gegen Größe/SHA-256 geprüft,
+danach geladen; die Antwort erscheint schrittweise. **Stoppen** funktioniert
+auch während der Prüfung und beim Laden. Schließen des Fensters beendet den
+lokalen Prozess. Nach Abschluss oder Fehler ist ein manueller Neustart möglich.
+
+Voraussetzungen: nativer Apple-Silicon-Mac, der [NX-005-Build](mac-metal.md) unter
+`local/build/llama-metal/bin/llama-completion`, das gepinnte Modell unter `models/`
+und `config/model-manifest.json`. Fehlende Voraussetzungen werden angezeigt;
+es erfolgt weder Installation noch Download. Windows zeigt die Einschränkung.
+
+Grenzen: einzelne Fragen ohne Gesprächshistorie, 1024 Kontexttokens, höchstens
+4000 Eingabezeichen und 128 Ausgabetokens; der Tokenbedarf kann je nach Text schon
+vor 4000 Zeichen das Kontextfenster überschreiten. Zeitlimit 240 Sekunden für
+Prüfung plus Modelllauf. Lange Antworten können abbrechen. Denktext kann trotz
+der Runtime-Option `--reasoning off` sichtbar bleiben. Keine erfundenen
+Geschwindigkeits-/TTFT-Werte. Für wiederholbare Benchmarks gilt NX-007.
+
+Technik: `nexus_ui/local_model.py` verwaltet jeweils einen asynchronen QProcess.
+Erst Hashprüfung, dann direkte Runtime-Ausführung ohne Shell. Der Prompt wird
+über stdin übergeben, nicht als Prozessargument oder temporäre Datei. Runtime-
+Logs werden verworfen, Fehler als allgemeine verständliche Meldungen angezeigt.
+Keine Prompt-/Antwortpersistenz, kein HTTP-/RPC-Server. Demo-Aktionen verändern
+den lokalen Modellprozess nicht.
+
+### NX-042-Nachweis vom 12.11.2026
+
+39 lokale Tests bestanden: 25 Standardbibliothek, 6 Demo-Interaktionstests und
+8 neue Qt-Prozesstests. Letztere verwenden echte kleine Kindprozesse ohne Modell
+für Unicode-Streaming/stdin, fehlgeschlagene Hashprüfung, Stopp in beiden Phasen,
+manuellen Neustart, Timeout, Start-/Runtimefehler und Fensterschließen. Rohfehler
+werden nicht in die Oberfläche übernommen. Compileall und Whitespace geprüft.
+
+Auf dem physischen Apple-M5-Mac mit macOS 27.2, Python 3.13.15 und PySide6 6.8.3
+die native UI geöffnet und tatsächlich geprüft: Abbruch während SHA-Prüfung,
+Abbruch beim Modellladen, Navigation während des Laufs, manueller Neustart und
+echte Antwort `Hallo aus Nexus.`. Nach Abschluss kein aktiver Kindprozess.
+Die fertige lokale Ansicht visuell geprüft; Satoshi fehlt auf diesem Mac,
+Systemschrift-Fallback aktiv. Windows-/Linux-CI testet Prozesssteuerung mit
+Testprozessen, keine dortige Inferenz. High-DPI/Screenreader-Abnahme bleibt NX-037.
 
 ## Start
 
@@ -66,7 +110,7 @@ Für die spätere App-Verteilung LGPL-/Drittanbieterpflichten und verwendete
 Module separat dokumentieren; diese Demo erstellt keinen Installer. Die
 Projektlizenz bleibt offen.
 
-## Bedienpfad
+## Bedienpfad der Demo
 
 1. Einrichtung: Geräteprüfung und Modellprüfung simulieren.
 2. Geräte: gegenseitige Freigabe simulieren; RAM-Limit als unwirksamen Entwurf ändern.

@@ -74,4 +74,5 @@ Die Modelldatei wurde anschließend mit dem lokalen Metal-Build ausgeführt.
 CMake liegt in `.venv`, die Runtime unter `local/build/llama-metal`.
 Die 32 GiB Unified Memory sind keine Garantie für ein bestimmtes Kontext- oder
 Leistungsbudget; tatsächlichen Speicherverbrauch beim Laden prüfen. Die
-Desktop-Demo bleibt bis zur separaten Integration eine Simulation.
+Demo-Seiten bleiben simuliert; die getrennte [lokale UI-Ansicht](desktop.md)
+aus NX-042 verwendet dieselbe verifizierte Datei.

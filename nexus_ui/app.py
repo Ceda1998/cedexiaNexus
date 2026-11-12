@@ -1,4 +1,4 @@
-"""An explicitly simulated UI. No networking, hardware probes or inference."""
+"""Desktop prototype with separate demo pages and explicit local inference."""
 from pathlib import Path
 import sys
 
@@ -10,6 +10,7 @@ from PySide6.QtWidgets import (
     QPushButton, QStackedWidget, QScrollArea, QFrame, QComboBox,
     QPlainTextEdit, QSpinBox, QMessageBox,
 )
+from .local_model import LocalModelPage
 
 ASSETS = Path(__file__).parent / "assets"
 STYLE = """
@@ -70,9 +71,10 @@ def button(text, callback, name=None, primary=False):
 
 
 class NexusWindow(QMainWindow):
-    def __init__(self):
+    def __init__(self, local_runner=None):
         super().__init__()
-        self.setWindowTitle("Cedexia Nexus · Desktop-Demo")
+        self.setWindowTitle("Cedexia Nexus · Lokales Modell & Demo")
+        self.closing = False
         self.resize(1200, 850)
         self.setMinimumSize(800, 600)
         self.checked = False
@@ -89,7 +91,8 @@ class NexusWindow(QMainWindow):
         layout.setContentsMargins(24, 20, 24, 20)
         layout.setSpacing(16)
         layout.addWidget(label("CEDEXIA NEXUS", "title"))
-        layout.addWidget(label("DEMO · Beispieldaten · Keine Verbindung und keine Modellberechnung", "banner"))
+        self.banner = label("", "banner")
+        layout.addWidget(self.banner)
         self.font_notice = label("", "subtitle")
         layout.addWidget(self.font_notice)
         body = QHBoxLayout()
@@ -101,7 +104,8 @@ class NexusWindow(QMainWindow):
         self.nav = []
         for i, (title, name) in enumerate([
             ("Übersicht", "layout-dashboard"), ("Einrichtung", "checklist"),
-            ("Geräte", "devices"), ("Sitzung", "message"), ("Über Nexus", "settings"),
+            ("Geräte", "devices"), ("Demo-Sitzung", "message"),
+            ("Lokales Modell", "player-play"), ("Über Nexus", "settings"),
         ]):
             nav = button(title, lambda checked=False, index=i: self.navigate(index), name)
             nav.setCheckable(True)
@@ -112,6 +116,9 @@ class NexusWindow(QMainWindow):
         self.setup()
         self.devices()
         self.session()
+        self.local_model = LocalModelPage(runner=local_runner)
+        self.stack.addWidget(self.local_model)
+        self.local_model.runner.finished.connect(self.local_finished)
         self.about()
         self.navigate(0)
         self.refresh()
@@ -146,7 +153,8 @@ class NexusWindow(QMainWindow):
     def overview(self):
         layout = self.page("Rechenleistung verbinden.", "Zwei Geräte. Eine lokale KI-Sitzung — als Ablaufvorschau.")
         self.summary = self.panel(layout, "Dein Arbeitsbereich", "")
-        self.panel(layout, "Gemeinsame Berechnung", "Nicht belegt. Diese Demo verwendet keine Inferenz-Engine.")
+        self.panel(layout, "Gemeinsame Berechnung", "Nicht belegt. Diese Vorschau ist simuliert. Echte Mac-Inferenz findest du unter ‚Lokales Modell‘.")
+        layout.addWidget(button("Lokales Modell öffnen", lambda: self.navigate(4), "player-play", True))
         layout.addWidget(button("Einrichtung öffnen", lambda: self.navigate(1), "checklist", True))
         layout.addStretch()
 
@@ -162,7 +170,7 @@ class NexusWindow(QMainWindow):
 
     def devices(self):
         layout = self.page("Deine Geräte.", "Beispielprofile. RAM, VRAM und Unified Memory werden getrennt betrachtet.")
-        self.panel(layout, "Mac · Beispielprofil", "32 GiB Unified Memory · Freier Speicher nicht ermittelt\nMetal nicht getestet · M5/M5 Pro noch zu klären")
+        self.panel(layout, "Mac · Beispielprofil", "32 GiB Unified Memory · Freier Speicher hier nicht ermittelt\nDer lokale M5-Metal-Test ist separat unter ‚Lokales Modell‘ verfügbar.")
         self.peer_status = self.panel(layout, "Windows-PC · Beispielprofil", "")
         layout.addWidget(button("Freigabe auf beiden Geräten simulieren", self.pair_peer, "devices"))
         layout.addWidget(button("Zweites Gerät trennen (Demo)", self.disconnect_peer, "devices"))
@@ -212,10 +220,10 @@ class NexusWindow(QMainWindow):
         layout.addWidget(label("TTFT: Nicht gemessen · Tokens/s: Nicht gemessen · Beteiligung beider Geräte: Nicht nachgewiesen", "subtitle"))
 
     def about(self):
-        layout = self.page("Über Nexus.", "NX-037 · Offline-Interaktionsprototyp")
+        layout = self.page("Über Nexus.", "NX-037 · Demo / NX-042 · Lokaler Mac-Modelltest")
         self.panel(layout, "Darstellung", "Dunkelblau #173B70 · Eckige Komponenten · Satoshi lokal\nTabler Icons Outline v3.35.0 · MIT")
         layout.addWidget(button("Tabler-Lizenz anzeigen", self.show_license, "settings"))
-        self.panel(layout, "Daten", "Nur flüchtiger Demo-Zustand im Arbeitsspeicher. Kein Netzwerk, keine Modellgewichte und kein automatisches Speichern.")
+        self.panel(layout, "Daten", "Demo-Seiten sind simuliert. ‚Lokales Modell‘ verarbeitet deine Frage mit den vorhandenen lokalen Gewichten. Kein Netzwerk und kein Speichern von Eingaben oder Antworten.")
         layout.addStretch()
 
     def show_license(self):
@@ -227,6 +235,8 @@ class NexusWindow(QMainWindow):
 
     def navigate(self, index):
         self.stack.setCurrentIndex(index)
+        self.banner.setText("LOKAL · Echte Modellantwort auf diesem Mac · Kein Dual-Host-Betrieb" if index == 4 else
+                            "DEMO · Diese Ablaufseiten sind simuliert; echte Inferenz unter ‚Lokales Modell‘")
         for i, nav in enumerate(self.nav):
             nav.setChecked(index == i)
 
@@ -315,7 +325,16 @@ class NexusWindow(QMainWindow):
 
     def closeEvent(self, event):
         self.timer.stop()
+        if self.local_model.runner.busy:
+            self.closing = True
+            event.ignore()
+            self.local_model.runner.stop("Fenster geschlossen; lokaler Prozess beendet.")
+            return
         super().closeEvent(event)
+
+    def local_finished(self, _):
+        if self.closing:
+            self.close()
 
 
 def make_application():
@@ -334,6 +353,7 @@ def make_application():
 def main():
     app, font_loaded = make_application()
     window = NexusWindow()
+    window.navigate(4)
     if not font_loaded:
         window.font_notice.setText("Satoshi fehlt · Systemschrift aktiv. Einrichtung siehe docs/desktop.md.")
     window.show()

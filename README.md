@@ -13,7 +13,10 @@ Komponenten, lokal installierte Satoshi und Tabler-Outline-SVGs.
 [Start für Windows/macOS, Schriftinstallation und Grenzen](docs/desktop.md).
 Lokale UI-Tests unter Linux/macOS bestanden; sichtbarer Mac-Start bestätigt.
 Vollständige Windows-/Mac-Abnahme (u. a. High-DPI) bleibt offen.
-Hardwarediagnose und Inferenz sind noch nicht mit der UI verbunden.
+NX-042 ergänzt **„Lokales Modell“**: echte Mac-Inferenz mit Eingabe, laufender
+Ausgabe und Stopp. Start: `.venv/bin/python -m nexus_ui`. Die Ansicht öffnet sich
+direkt; Voraussetzungen und Grenzen stehen in [docs/desktop.md](docs/desktop.md).
+Hardwarediagnose, Windows-Inferenz und Dual-Host sind noch nicht angebunden.
 
 NX-005: Qwen3.8-27B Q4_K_M generiert lokal auf dem bestätigten M5-Mac Text mit
 Metal (65/65 Layer auf GPU). [Start und Nachweis](docs/mac-metal.md):

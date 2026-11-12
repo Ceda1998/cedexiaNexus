@@ -9,16 +9,19 @@ Zeitlimits ab und gibt einen kleinen JSON-Bericht aus. Fehlende Werkzeuge oder
 Probe-Fehler werden zu `unknown`; Rohfehler und Werkzeugpfade werden verworfen.
 Unit-Tests simulieren auch fehlende Programme und unvollständige Antworten.
 
-Die Offline-UI aus NX-037 verwendet Python/PySide6 als ersten Desktop-Spike.
-Sie hält ausschließlich Demo-Zustand im Arbeitsspeicher und verwendet einen
-Qt-Timer für fest vorgegebene Beispielausgabe. Es gibt keine Netzwerk- oder
-Inferenzanbindung. `scripts/doctor.py` bleibt unabhängig; ein späterer Adapter
+Die UI aus NX-037 verwendet Python/PySide6 als ersten Desktop-Spike.
+Die Demo-Seiten halten ihren Zustand im Arbeitsspeicher und verwenden einen
+Qt-Timer für fest vorgegebene Beispielausgabe. NX-042 ergänzt eine getrennte
+lokale Mac-Inferenzseite: asynchrone QProcess-Hashprüfung, danach der geprüfte
+Metal-Prozess mit stdin-Prompt, laufender Ausgabe und kontrolliertem Abbruch.
+Es gibt keine Netzwerk-Anbindung. `scripts/doctor.py` bleibt unabhängig; ein späterer Adapter
 muss echte Diagnose asynchron ausführen. Start, Assets und Lizenzgrenzen:
 [desktop.md](desktop.md). Windows-/Mac-Abnahme des Toolkit-Spikes bleibt offen.
 
 NX-005 ergänzt einen lokal gebauten llama.cpp-Terminaltest mit nachgewiesener
 Metal-Textgenerierung auf dem M5. Start und Grenzen: [mac-metal.md](mac-metal.md).
-Eine integrierte Nexus-Inferenzsteuerung fehlt. Die folgende verteilte Richtung
+NX-042 bindet diesen einzelnen lokalen Lauf an die UI an. Eine verteilte
+Nexus-Inferenzsteuerung fehlt. Die folgende verteilte Richtung
 ist ein Versuchsplan, keine implementierte Architektur:
 
 | Rolle | Verantwortung im späteren Versuch | Status |

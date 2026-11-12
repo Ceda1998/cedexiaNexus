@@ -11,7 +11,9 @@ separate Tickets. Einstieg: README.md; Messplan und Abnahme: docs/prototype.md.
 
 NX-037 ergänzt auf Nutzerauftrag eine frühe Offline-Desktop-Demo. UI-Code liegt
 in nexus_ui/, Start und Lizenzhinweise in docs/desktop.md. Simulierte Daten
-stets markieren; keine Live-Funktionen aus einer Demo ableiten. Satoshi-Dateien
+stets markieren; keine Live-Funktionen aus einer Demo ableiten. NX-042 ergänzt
+eine getrennte lokale Mac-Inferenzansicht mit asynchroner Prüfung und Runtime,
+Stopp/Timeout und ohne Server; Windows-/Dual-Host-Anbindung bleibt offen. Satoshi-Dateien
 nur lokal installieren und nicht über Git verteilen. Tabler-SVGs samt MIT-Lizenz
 und Versionsmanifest ausliefern.
 

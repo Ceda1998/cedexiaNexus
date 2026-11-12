@@ -2,8 +2,8 @@
 
 Am 12.11.2026 auf dem bestätigten Apple M5 (Mac17,2), 32 GiB Unified Memory,
 macOS 27.2/SDK 27.2, arm64 geprüft. **Nativer Build, GPU-Erkennung und kurze
-Textgenerierung erfolgreich.** CUDA, Dual-Host und die Desktop-Anbindung sind
-damit nicht nachgewiesen.
+Textgenerierung erfolgreich.** CUDA und Dual-Host sind damit nicht nachgewiesen.
+Die nachfolgende [Desktop-Anbindung NX-042](desktop.md) erlaubt den lokalen UI-Test.
 
 ## Auf diesem Mac starten
 
@@ -19,7 +19,8 @@ Das Skript startet einen einzelnen Terminal-Lauf, beendet ihn nach Antwortende
 oder spätestens 128 generierten Tokens und öffnet keinen Server. Abbruch mit
 Ctrl+C. Kontext 1024 Tokens, Batch/UBatch 128, vier CPU-Threads, alle möglichen
 Layer auf `MTL0`, Offline-Modus, Jinja-Template aus dem GGUF, greedy Sampling.
-Die Desktop-Demo bleibt unabhängig und zeigt weiterhin simulierte Daten.
+Die Demo-Seiten bleiben simuliert; „Lokales Modell“ erlaubt einen separaten
+echten Modelllauf über die UI.
 
 Bekannte Grenze dieses upstream `llama-completion`-Pfads: Trotz `--reasoning off`
 enthielt die Ausgabe einen Thinking-Abschnitt vor der abschließenden Antwort.
