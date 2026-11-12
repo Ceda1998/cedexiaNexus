@@ -6,15 +6,15 @@
 müssen während derselben Inferenz nachweisbar Modelloperationen ausführen;
 ein Client auf einem Gerät und alleinige Inferenz auf dem anderen genügen nicht.
 
-| Gerät | Nutzerangabe, noch keine vollständige Inventur |
+| Gerät | Inventurstand |
 | --- | --- |
 | Home-PC | Windows; AMD Ryzen 7 (etwa vier Jahre alt); RTX 5070 Ti, 16 GB VRAM; 32 GB DDR4 RAM |
-| MacBook | Apple M5 Pro; 32 GB Unified Memory; macOS |
+| MacBook | Apple M5; 32 GiB Unified Memory; macOS 27.2; [NX-002-Inventur](hardware.md), als Zielgerät bestätigt |
 | Netzwerk | Beide Geräte können Ethernet/WLAN; reale LAN-Geschwindigkeit offen |
 
 Der Modellkandidat ist multimodal; zunächst wird nur Text untersucht.
-GGUF Q4_K_M mit ungefähr 19,4 GB ist die Planungsannahme aus dem Auftrag.
-Konkrete Datei, Revision und SHA-256 müssen in NX-004 verifiziert werden.
+GGUF Q4_K_M mit 19.403.684.480 Byte ist in [NX-004](model.md) anhand
+veröffentlichter Metadaten mit Revision und SHA-256 festgelegt.
 Gewichtgröße ist kein Laufzeit-Speicherbedarf: OS, Runtime und KV-Cache benötigen
 zusätzliche Reserve. Zwei Hosts mit nominell je 32 GB ergeben keine Garantie,
 dass eine bestimmte Quantisierung gemeinsam passt.
@@ -76,8 +76,9 @@ verlinkten Bootstrap-Dateien angelegt; keine zusätzlichen Pakete oder Modelle.
 Die Sandbox blockierte die sysctl-Abfragen: Der Bericht gab dort CPU/RAM
 korrekt als `unknown` aus. Die obigen Hardwarewerte stammen aus der ausdrücklich
 freigegebenen Ausführung außerhalb der Sandbox. Der aktuelle Rechner meldet
-**Apple M5**, abweichend von der geplanten Hardware **M5 Pro**. Diese Abweichung
-ist bei NX-002 zu klären. Git, clang und xcrun wurden gefunden; cmake, ninja,
+**Apple M5**, abweichend von der ursprünglich geplanten Hardware **M5 Pro**.
+In NX-002 hat der Nutzer diesen M5 als Zielgerät bestätigt. Git, clang und
+xcrun wurden gefunden; cmake, ninja,
 nvcc und nvidia-smi nicht im PATH. Es fand keine Metal-Inferenz statt.
 
 Der lokale Projektordner war leer und noch kein Git-Checkout. Auf ausdrücklichen

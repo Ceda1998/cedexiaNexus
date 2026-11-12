@@ -11,7 +11,8 @@ NX-037 ergänzt eine **Offline-Desktop-Demo** mit PySide6: Übersicht, Einrichtu
 Geräte, Ressourcenentwurf und simulierter Sitzungsablauf. Dunkelblau, eckige
 Komponenten, lokal installierte Satoshi und Tabler-Outline-SVGs.
 [Start für Windows/macOS, Schriftinstallation und Grenzen](docs/desktop.md).
-Lokale UI-Tests unter Linux bestanden; physische Windows-/Mac-Abnahme offen.
+Lokale UI-Tests unter Linux/macOS bestanden; sichtbarer Mac-Start bestätigt.
+Vollständige Windows-/Mac-Abnahme (u. a. High-DPI) bleibt offen.
 Hardwarediagnose und Inferenz sind noch nicht mit der UI verbunden.
 
 NX-040 stellt die Repository-Grundlage bereit: Dokumentation, lokale Diagnose,
@@ -62,15 +63,25 @@ Plattformantworten; das ersetzt keine Ausführung auf der Zielhardware.
 - [Architektur und offene Entscheidungen](docs/architecture.md)
 - [Sicherheit und Vertrauensgrenzen](docs/security.md)
 - [Prototyp, Abnahmekriterien und Bootstrap-Testnachweis](docs/prototype.md)
+- [Mac-Inventur und Toolchain-Voraussetzungen](docs/hardware.md):
+  `python3 -m scripts.inventory_mac`
+- [Festgelegtes Modellartefakt und lokale Hashprüfung](docs/model.md):
+  `python3 -m scripts.verify_model /pfad/zur/Modelldatei.gguf`
 - [Diagnoseskript](scripts/doctor.py), [Tests](tests/test_doctor.py),
   [GitHub Actions](.github/workflows/ci.yml)
 
 ## Nächste Tickets
 
-1. NX-001: Windows-PC, genaue CPU, RAM, Treiber und CUDA-Werkzeuge inventarisieren.
-2. NX-002: MacBook, Unified Memory, macOS und Metal-Werkzeuge inventarisieren.
-3. NX-003: Tatsächliche LAN-Latenz und Bandbreite messen.
-4. NX-004: GGUF-Datei, Quantisierung, Revision und SHA-256 festlegen.
+NX-002 (Inventur des bestätigten M5-Macs) und NX-004 (Modellmetadaten und
+Integritätsprüfung) sind umgesetzt. Es wurde noch kein Modell heruntergeladen.
+
+1. NX-005: Nativen Metal-Build mit dem festgelegten Runtime-Kandidaten prüfen;
+   CMake fehlt auf diesem Mac noch.
+2. NX-001: Windows-PC, genaue CPU, RAM, Treiber und CUDA-Werkzeuge inventarisieren;
+   anschließend NX-006 für den nativen CUDA-Build.
+3. NX-003: Tatsächliche LAN-Latenz und Bandbreite zwischen beiden Geräten messen.
+4. NX-007/008: Erst mit separat bereitgestellter, lokal verifizierter Modelldatei
+   die Einzelhost-Baselines messen; danach NX-009 und NX-011/012.
 
 ## Grenzen und Lizenz
 
