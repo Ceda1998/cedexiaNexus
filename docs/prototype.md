@@ -65,10 +65,12 @@ verlinkten Bootstrap-Dateien angelegt; keine zusätzlichen Pakete oder Modelle.
 | Befehl / Prüfung | Tatsächliches Ergebnis |
 | --- | --- |
 | `python3 scripts/doctor.py` | Exit 0; gültiges JSON; Apple M5, 34.359.738.368 Byte RAM (32 GiB), Metal-Indiz `spdisplays_metal4` |
-| `python3 -m unittest discover -s tests -v` | `Ran 17 tests in 0.023s` / `OK` |
+| `python3 -m unittest discover -s tests -v` | `Ran 17 tests in 0.014s` / `OK` |
+| Gesamte Testsuite mit simuliert fehlendem `os.sysconf` | `Ran 17 tests in 0.008s` / `OK`; POSIX-Mocks funktionieren auch ohne das Windows-fremde Attribut |
 | `python3 -m compileall -q scripts tests` | Exit 0; keine Syntaxfehler |
 | CI-YAML mit Ruby-Standardbibliothek geparst | Gültiges YAML; Jobdefinition vorhanden |
 | `git check-ignore` mit neun Beispielpfaden | Secrets, Modelle, lokale Berichte, Caches und Build-Binärdateien ausgeschlossen |
+| `git diff --cached --check` | Exit 0; vorgemerkte Bootstrap-Dateien ohne Whitespace-Fehler |
 | `len(Path("AGENTS.md").read_text(encoding="utf-8"))` | 3.278 Zeichen, innerhalb des Zielbereichs |
 
 Die Sandbox blockierte die sysctl-Abfragen: Der Bericht gab dort CPU/RAM
@@ -89,7 +91,8 @@ Windows-/Linux-Hardware, CUDA, Metal-Ausführung, Modellladen und verteilte
 Inferenz sind durch diese lokalen Tests nicht validiert. Die CI ist für
 Python 3.11 auf Linux, Windows und macOS sowie Python 3.13 auf Linux konfiguriert;
 ihre Läufe werden separat auf GitHub ausgeführt. Die simulierten Plattformtests
-ersetzen keine Inventur der tatsächlichen Zielgeräte.
+ersetzen keine Inventur der tatsächlichen Zielgeräte. Verbindliche Ergebnisse
+des jeweiligen Commits stehen unter [GitHub Actions](https://github.com/Ceda1998/cedexiaNexus/actions).
 
 ## Referenzen
 

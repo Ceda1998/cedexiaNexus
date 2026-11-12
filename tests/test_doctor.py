@@ -85,12 +85,12 @@ class HardwareTests(unittest.TestCase):
                 self.assertEqual(doctor.windows_hardware(), ("unknown", "unknown", "unknown"))
 
     def test_linux_ram_uses_physical_pages(self):
-        with patch.object(doctor.os, "sysconf", side_effect=[8388608, 4096]), patch.object(doctor.platform, "processor", return_value=""):
+        with patch.object(doctor.os, "sysconf", side_effect=[8388608, 4096], create=True), patch.object(doctor.platform, "processor", return_value=""):
             self.assertEqual(doctor.posix_hardware(), ("unknown", 34359738368, "unknown"))
 
     def test_linux_ram_failure_is_unknown(self):
         for result in (ValueError("unsupported"), -1):
-            with self.subTest(result=result), patch.object(doctor.os, "sysconf") as sysconf:
+            with self.subTest(result=result), patch.object(doctor.os, "sysconf", create=True) as sysconf:
                 if isinstance(result, Exception):
                     sysconf.side_effect = result
                 else:
