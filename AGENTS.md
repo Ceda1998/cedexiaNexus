@@ -1,0 +1,61 @@
+# Arbeitsanweisungen für Cedexia Nexus
+
+## Ziel und aktueller Fokus
+Cedexia Nexus untersucht sichere verteilte LLM-Inferenz. Der erste Prototyp
+soll Qwen3.8-27B für Text gemeinsam auf Windows/CUDA und macOS/Metal ausführen;
+beide Hosts müssen an derselben Modellberechnung beteiligt sein. Ein Remote-
+Chat ist kein Nachweis. Backend-Kompatibilität und Leistung sind noch offen.
+
+Der aktuelle Stand ist der NX-040-Bootstrap. Halte Änderungen klein und
+reproduzierbar. Neue Inferenzfunktionen gehören in separate Tickets. Nutze
+README.md als Einstieg und docs/prototype.md für Messplan und Abnahmekriterien.
+
+## Sicherheitsregeln und Grenzen
+- Keine Modellgewichte automatisch herunterladen, großen Binärdateien oder
+  fremden Installer ungeprüft einbinden. Quellen, Revisionen und Hashes prüfen.
+- Keine Ports freigeben oder RPC-Server starten, sofern der konkrete Auftrag
+  dies nicht ausdrücklich umfasst. Experimentelles llama.cpp RPC niemals
+  ungeschützt öffentlich oder mit sensiblen Daten betreiben.
+- Keine Secrets, privaten IPs, Hostnamen, Schlüssel, Tokens oder unbereinigten
+  Rohlogs in Dateien, Commits oder CI-Artefakten speichern. Lokale Daten gehören
+  in ignorierte Verzeichnisse; .gitignore ersetzt keine Inhaltsprüfung.
+- Keine Remote-Shells, privilegierten Container oder administrativen Freigaben.
+  Vertrauensgrenzen und bekannte Risiken stehen in docs/security.md.
+- Kein produktives Sicherheitsniveau, keine GPU-Unterstützung und keine
+  Performance behaupten, die nicht praktisch nachgewiesen wurden.
+- Remotes und Pushes nur im ausdrücklich autorisierten Auftragsumfang ändern.
+  Vorhandene Änderungen prüfen und erhalten; niemals ungefragt force-pushen.
+
+## Repository-Orientierung
+- scripts/doctor.py: lokale Diagnose mit Python-Standardbibliothek; schreibt
+  JSON auf stdout, keine Dateien. Fehlende Messwerte sind unknown.
+- tests/test_doctor.py: Unit-Tests mit isolierten Hardware-/Prozessantworten.
+- .github/workflows/ci.yml: Tests ohne GPU, Modelle oder zusätzliche Pakete.
+- docs/architecture.md: technische Richtung und offene Entscheidungen.
+- docs/prototype.md: Hardwareannahmen, Testreihenfolge und Testnachweis.
+
+## Ausführen und prüfen
+Voraussetzung: Python >= 3.11 und Git. Keine Paketinstallation erforderlich.
+Im Repository-Root unter macOS:
+
+```sh
+python3 scripts/doctor.py
+python3 -m unittest discover -s tests -v
+python3 -m compileall -q scripts tests
+git diff --check
+```
+
+In Windows PowerShell dieselben Python-Befehle mit `py -3` statt `python3`
+ausführen; CI verwendet `python`. Für diesen Bootstrap gibt es kein separates
+Build. Ein Diagnosebericht bestätigt keine funktionsfähige Inferenz.
+
+## Definition of Done
+Relevante Tests ausführen und tatsächliche Ergebnisse mit Plattform und Grenzen
+dokumentieren. Änderungen auf Secrets, große Dateien und unbelegte Aussagen
+prüfen. Abschließend Git-Status und Diff kontrollieren. NX-040 erst nach
+überprüfbaren Abnahmekriterien abschließen. Keine Skills oder Platzhalter ohne
+konkreten wiederkehrenden Bedarf; Details in Skripten oder den vorhandenen Docs
+pflegen. Die Projektlizenz ist offen; keine Lizenz eigenmächtig festlegen.
+
+Postman CLI ist optional unter /Users/cedric.daunke/.local/bin/postman verfügbar.
+Für Diagnose und Tests dieses Repositories wird es nicht benötigt.
