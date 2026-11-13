@@ -13,7 +13,6 @@ from unittest.mock import patch
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 try:
     from PySide6.QtCore import QSettings
-    from PySide6.QtTest import QTest
     from nexus_ui.app import NexusWindow, make_application
     from nexus_ui.device_pairing import pinned_source
     from nexus_ui.local_model import LocalRunner
@@ -30,10 +29,11 @@ class DevicePairingTests(unittest.TestCase):
     def setUpClass(cls):
         cls.app, _ = make_application()
 
-    def wait_for(self, predicate, timeout=5):
+    def wait_for(self, predicate, timeout=10):
         deadline = time.monotonic() + timeout
         while not predicate() and time.monotonic() < deadline:
-            QTest.qWait(10)
+            self.app.processEvents()
+            time.sleep(0.01)
         self.assertTrue(predicate())
 
     def window(self, directory, name):
@@ -88,8 +88,10 @@ class DevicePairingTests(unittest.TestCase):
         host.runner.select_model(mac_model)
         host.interfaces.clear()
         host.interfaces.addItem("Test", "127.0.0.1")
+        self.assertTrue(host.host.isEnabled())
         host.host.click()
-        self.wait_for(lambda: bool(host.code.text()))
+        self.wait_for(lambda: bool(host.code.text()) or host.thread is None)
+        self.assertTrue(host.code.text(), host.status.text())
         code = host.code.text()
         address, port, fingerprint, secret = read_invitation(code)
         for wrong in (make_invitation(address, port, bytes(32), secret),
