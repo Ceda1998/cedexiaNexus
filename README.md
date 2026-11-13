@@ -76,6 +76,8 @@ Plattformantworten; das ersetzt keine Ausführung auf der Zielhardware.
   `python3 -m scripts.inventory_mac`
 - [Festgelegtes Modellartefakt und lokale Hashprüfung](docs/model.md):
   `python3 -m scripts.verify_model /pfad/zur/Modelldatei.gguf`
+- [Mac-Solo-Baseline (NX-007)](docs/mac-baseline.md):
+  `python3 -m scripts.benchmark_mac`
 - [Diagnoseskript](scripts/doctor.py), [Tests](tests/test_doctor.py),
   [GitHub Actions](.github/workflows/ci.yml)
 
@@ -85,12 +87,10 @@ NX-002 (Inventur des bestätigten M5-Macs) und NX-004 (Modellmetadaten und
 Integritätsprüfung) sind umgesetzt. Das Q4_K_M-Testmodell wurde auf ausdrücklichen
 Nutzerauftrag lokal heruntergeladen und verifiziert; es ist nicht Teil von Git.
 
-1. NX-007: Reproduzierbare Mac-Solo-Baseline auf dem in NX-005 geprüften
-   Metal-Build messen; bisher nur kurze Funktionstests.
-2. NX-001: Windows-PC, genaue CPU, RAM, Treiber und CUDA-Werkzeuge inventarisieren;
+1. NX-001: Windows-PC, genaue CPU, RAM, Treiber und CUDA-Werkzeuge inventarisieren;
    anschließend NX-006 für den nativen CUDA-Build.
-3. NX-003: Tatsächliche LAN-Latenz und Bandbreite zwischen beiden Geräten messen.
-4. NX-008: Nach NX-006 die Windows-Solo-Baseline messen; danach NX-009 und
+2. NX-003: Tatsächliche LAN-Latenz und Bandbreite zwischen beiden Geräten messen.
+3. NX-008: Nach NX-006 die Windows-Solo-Baseline messen; danach NX-009 und
    NX-011/012 für den gemeinsamen Rechennachweis.
 
 ## Grenzen und Lizenz

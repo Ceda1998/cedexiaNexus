@@ -102,8 +102,9 @@ Beobachtete Decode-Rate: 5,97 bzw. 6,10 Token/s; zweiter Lauf 62 Prompttokens,
 42 Decode-Schritte, 1,60 s Ladezeit und 9,35 s gesamte Prozessdauer.
 Das sind **Smoke-Test-Beobachtungen, kein Benchmark**: Cachezustand und
 Begleitlast unterschieden sich; keine drei Wiederholungen oder Medianbildung.
-Reproduzierbare Solo-Baselines, Kontext-/Speicherbudget und längere Stabilität
-bleiben NX-007. Beide Hosts zusammen müssen später separat geprüft werden.
+Die [Mac-Solo-Baseline NX-007](mac-baseline.md) dokumentiert die spätere
+standardisierte Messreihe. Langkontext, längere Stabilität und beide Hosts
+zusammen müssen separat geprüft werden.
 
 Repository-Prüfung: 31 Tests einschließlich 6 Qt-Tests bestanden, Compileall,
 Shell-Syntax und Whitespace-Prüfung erfolgreich. Der Starthelfer wurde zusätzlich
