@@ -3,6 +3,7 @@ import hashlib
 import io
 import json
 from pathlib import Path
+import struct
 import tempfile
 import unittest
 
@@ -56,3 +57,24 @@ class ModelVerificationTests(unittest.TestCase):
                 verify_model.verify(self.path, {"artifact": artifact})
         with self.assertRaises(ValueError):
             verify_model.verify(Path(self.directory.name), self.manifest)
+
+    def test_gguf_header_cli_checks_format_without_matching_manifest_size(self):
+        header = struct.Struct("<4sIQQ")
+        payload = bytes(128)
+        cases = (
+            (header.pack(b"GGUF", 3, 1, 1) + payload, None),
+            (header.pack(b"GGUF", 2, 1, 1) + payload * 2, None),
+            (header.pack(b"GGUF", 3, 1, 1), "truncated"),
+            (b"GGUF", "truncated"),
+            (header.pack(b"JSON", 3, 1, 1) + payload, "not_gguf"),
+            (header.pack(b"GGUF", 1, 1, 1) + payload, "unsupported_version"),
+            (header.pack(b"GGUF", 3, 0, 1) + payload, "no_tensors"),
+        )
+        for data, error in cases:
+            with self.subTest(error=error, size=len(data)):
+                self.path.write_bytes(data)
+                output = io.StringIO()
+                with contextlib.redirect_stdout(output):
+                    status = verify_model.main([str(self.path), "--gguf"])
+                self.assertEqual(status, int(error is not None))
+                self.assertEqual(json.loads(output.getvalue()), {"header_ok": error is None, "error": error})

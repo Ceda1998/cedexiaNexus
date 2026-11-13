@@ -4,15 +4,22 @@
    [Windows-Paketlauf](https://github.com/Ceda1998/cedexiaNexus/actions/workflows/windows-app.yml) herunterladen.
 2. Das vollständige ZIP entpacken und im Ordner **CedexiaNexus**
    **CedexiaNexus.exe** doppelklicken. Der Ordner `_internal` gehört zur App.
-3. Unter **Lokales Modell** deine vorhandene `Qwen3.8-27B-Q4_K_M.gguf`
-   auswählen und eine kurze Frage starten. Die App merkt sich den Pfad
-   und prüft die Datei vor dem Modelllauf.
+3. Unter **Lokales Modell** über **GGUF hinzufügen …** eine oder mehrere
+   vorhandene `.gguf`-Dateien hinzufügen. Das Modell in der Liste wählen,
+   eine Frage eingeben und **Lokal starten** klicken. Die App merkt sich die
+   Dateipfade. **Eintrag entfernen** entfernt den Pfad aus der Liste.
+
+Bei geteilten GGUFs den ersten Teil auswählen und alle Teile im selben Ordner
+belassen. Die App prüft den GGUF-Dateikopf, danach lädt llama.cpp das Modell.
+Die UI akzeptiert auch GGUF-Dateien anderer Modelle und Quantisierungen.
+Die [Prüfung des festgelegten Benchmarkmodells](model.md) ist separat verfügbar.
 
 Das Paket enthält Python, Qt, die vorgebaute llama.cpp-Runtime und die
 CUDA-Laufzeitbibliotheken. Für die Inferenz brauchst du einen kompatiblen
 [NVIDIA-Treiber für CUDA 13.5](https://docs.nvidia.com/cuda/cuda-toolkit-release-notes/)
-und die [festgelegte Modelldatei](model.md). Windows x64 und eine RTX 5070 Ti
-sind das erste Ziel. Der CUDA-Testpfad nutzt zunächst 32 GPU-Layer und
+und ein GGUF-Textmodell, dessen Architektur und Quantisierung die gebündelte
+llama.cpp-Version unterstützt und das in den verfügbaren Speicher passt.
+Windows x64 und eine RTX 5070 Ti sind das erste Ziel. Der CUDA-Testpfad nutzt 32 GPU-Layer und
 4096 Kontexttokens. Windows-CUDA-Inferenz muss auf dem Ziel-PC abgenommen werden.
 Das Paket ist ein unsignierter Testbuild.
 
@@ -39,5 +46,6 @@ py -3 -m scripts.package_windows
 ```
 
 Das Ergebnis liegt unter `dist/CedexiaNexus`. Der Build prüft die
-Runtime-Version, die Geräteliste und das Starten des gebündelten Fensters.
+Runtime-Version, die Geräteliste, das Starten des gebündelten Fensters sowie
+die GGUF-Kopfprüfung und die separate SHA-256-Prüfung in der EXE.
 Der GitHub-Runner prüft den Paketstart ohne Ziel-GPU oder Modellgewichte.

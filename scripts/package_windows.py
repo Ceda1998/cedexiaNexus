@@ -7,6 +7,7 @@ from pathlib import Path
 import platform
 import re
 import shutil
+import struct
 import subprocess
 import sys
 from tempfile import TemporaryDirectory
@@ -94,6 +95,13 @@ def smoke_package():
         )
         if json.loads(proof.stdout).get("verified") is not True:
             raise ValueError("The packaged model verifier did not verify the test file.")
+        model.write_bytes(struct.pack("<4sIQQ", b"GGUF", 3, 1, 1) + bytes(128))
+        proof = subprocess.run(
+            [exe, "--verify-local-model", str(model), "--gguf"],
+            cwd=WORK, check=True, capture_output=True, timeout=30,
+        )
+        if json.loads(proof.stdout).get("header_ok") is not True:
+            raise ValueError("The packaged model verifier did not accept a standalone GGUF header.")
 
 
 def stage_notices():

@@ -1,12 +1,15 @@
 """Real Qt subprocess lifecycle tests with tiny, model-free child processes."""
 import os
+from pathlib import Path
 import sys
+from tempfile import TemporaryDirectory
 import time
 import unittest
 from unittest.mock import patch
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 try:
+    from PySide6.QtCore import QSettings
     from PySide6.QtTest import QTest
     from nexus_ui.app import NexusWindow, make_application
     from nexus_ui.local_model import LocalRunner, LocalModelPage, windows_prompt
@@ -22,7 +25,7 @@ if LocalRunner is not None:
             super().__init__(**kwargs)
             # The test child reads raw stdin rather than llama.cpp's Windows console protocol.
             self.windows = False
-            self.verify_code = 'print(\'{"verified": true}\')'
+            self.verify_code = 'print(\'{"header_ok": true}\')'
             self.generate_code = (
                 'import sys,time; p=sys.stdin.read(); '
                 'sys.stderr.write("PRIVATE_PATH SECRET_LOG\\n"); '
@@ -81,12 +84,12 @@ class LocalModelTests(unittest.TestCase):
         self.assertNotIn("SECRET", str(self.output) + str(self.results))
         self.assertEqual(self.runner.prompt, "")
 
-    def test_invalid_hash_never_launches_runtime(self):
-        self.runner.verify_code = 'print(\'{"verified": false}\')'
+    def test_invalid_gguf_never_launches_runtime(self):
+        self.runner.verify_code = 'print(\'{"header_ok": false, "error": "truncated"}\')'
         self.runner.start("test")
         self.wait(lambda: not self.runner.busy)
         self.assertEqual(self.runner.phases, ["verify"])
-        self.assertIn("Modellprüfung fehlgeschlagen", self.results[0])
+        self.assertIn("unvollständig", self.results[0])
 
     def test_stop_during_verification_and_manual_restart(self):
         self.runner.verify_code = 'import time; time.sleep(30)'
@@ -96,7 +99,7 @@ class LocalModelTests(unittest.TestCase):
         self.wait(lambda: not self.runner.busy)
         self.assertEqual(self.runner.phases, ["verify"])
         self.assertIsNone(self.runner.process)
-        self.runner.verify_code = 'print(\'{"verified": true}\')'
+        self.runner.verify_code = 'print(\'{"header_ok": true}\')'
         self.runner.start("again")
         self.wait(lambda: not self.runner.busy)
         self.assertIn("again", "".join(self.output))
@@ -162,6 +165,47 @@ class LocalModelTests(unittest.TestCase):
             real.runtime = real.root / "missing-test-runtime"
             self.assertIn("Runtime fehlt", real.unavailable_reason())
         real.deleteLater()
+
+    def test_windows_model_selection_persists_and_forgetting_keeps_files(self):
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            settings = QSettings(str(root / "settings.ini"), QSettings.Format.IniFormat)
+            first, second = root / "Erstes Modell.gguf", root / "Zweites Modell.gguf"
+            first.write_bytes(b"first")
+            second.write_bytes(b"second")
+            settings.setValue("local_model_path", str(first))
+            with patch("nexus_ui.local_model.QSettings", return_value=settings), \
+                 patch("nexus_ui.local_model.platform.system", return_value="Windows"), \
+                 patch("nexus_ui.local_model.platform.machine", return_value="AMD64"):
+                runner = LocalRunner(root=root)
+                runner.runtime = Path(sys.executable)
+                page = LocalModelPage(runner=runner)
+                self.assertEqual(page.model_list.count(), 1)
+                with patch("nexus_ui.local_model.QFileDialog.getOpenFileNames",
+                           return_value=([str(first), str(second)], "")):
+                    page.choose_model.click()
+                self.assertEqual(page.model_list.count(), 2)
+                self.assertEqual(runner.model, second)
+                page.model_list.setCurrentIndex(0)
+                self.assertEqual(runner.model, first)
+                with patch.object(runner, "_spawn") as spawn:
+                    self.assertTrue(runner.start("Test"))
+                    self.assertEqual(spawn.call_args.args[2][-2:], [str(first), "--gguf"])
+                    self.assertFalse(page.choose_model.isEnabled())
+                    runner.stop()
+                page.remove_model.click()
+                self.assertTrue(first.is_file())
+                self.assertEqual(runner.model, second)
+                reloaded = LocalRunner(root=root)
+                self.assertEqual(reloaded.models, [str(second)])
+                self.assertEqual(reloaded.model, second)
+                second.unlink()
+                page.prompt.setPlainText("Test")
+                self.assertFalse(page.start.isEnabled())
+                self.assertIn("Modelldatei fehlt", runner.unavailable_reason())
+                page.deleteLater()
+                runner.deleteLater()
+                reloaded.deleteLater()
 
     def test_windows_prompt_stays_on_one_line_and_preserves_escapes(self):
         import re
