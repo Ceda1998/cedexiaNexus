@@ -9,7 +9,7 @@ Windows-Inferenz oder Dual-Host-Anbindung.
 ## Lokales Modell in der UI testen
 
 Auf dem in NX-005 eingerichteten Mac `.venv/bin/python -m nexus_ui` starten.
-Die App öffnet „Lokales Modell“. Eine kurze Frage eingeben und **Lokal starten**
+Die App öffnet „Lokales Modell“. Eine Aufgabe eingeben und **Lokal starten**
 wählen. Die Datei wird vor jedem Lauf vollständig gegen Größe/SHA-256 geprüft,
 danach geladen; die Antwort erscheint schrittweise. **Stoppen** funktioniert
 auch während der Prüfung und beim Laden. Schließen des Fensters beendet den
@@ -20,12 +20,19 @@ Voraussetzungen: nativer Apple-Silicon-Mac, der [NX-005-Build](mac-metal.md) unt
 und `config/model-manifest.json`. Fehlende Voraussetzungen werden angezeigt;
 es erfolgt weder Installation noch Download. Windows zeigt die Einschränkung.
 
-Grenzen: einzelne Fragen ohne Gesprächshistorie, 1024 Kontexttokens, höchstens
-4000 Eingabezeichen und 128 Ausgabetokens; der Tokenbedarf kann je nach Text schon
-vor 4000 Zeichen das Kontextfenster überschreiten. Zeitlimit 240 Sekunden für
-Prüfung plus Modelllauf. Lange Antworten können abbrechen. Denktext kann trotz
+Grenzen seit NX-043: einzelne Aufgaben ohne Gesprächshistorie, 16384 Kontexttokens,
+höchstens 12000 Eingabezeichen und 8192 Ausgabetokens. Zeichen sind keine Tokens:
+Eingabe, Template und Ausgabe teilen sich das Kontextfenster, das je nach Text
+schon vor 12000 Zeichen ausgeschöpft sein kann. Zeitlimit 1800 Sekunden für
+Prüfung plus Modelllauf. Lange Antworten können abbrechen; Denktext zählt zum
+Ausgabebudget. Denktext kann trotz
 der Runtime-Option `--reasoning off` sichtbar bleiben. Keine erfundenen
 Geschwindigkeits-/TTFT-Werte. Für wiederholbare Benchmarks gilt NX-007.
+
+Beispiel: `Baue mir eine kleine HTML-Website für ein Restaurant. Liefere eine
+vollständige kompakte HTML-Datei mit eingebettetem CSS, Speisekarte und Kontakt.`
+Die Ausgabe ist weiterhin Klartext zum Kopieren; generierter Code wird nicht
+ausgeführt. Nach einem Update die App neu starten, damit die neuen Grenzen gelten.
 
 Technik: `nexus_ui/local_model.py` verwaltet jeweils einen asynchronen QProcess.
 Erst Hashprüfung, dann direkte Runtime-Ausführung ohne Shell. Der Prompt wird
@@ -49,6 +56,36 @@ echte Antwort `Hallo aus Nexus.`. Nach Abschluss kein aktiver Kindprozess.
 Die fertige lokale Ansicht visuell geprüft; Satoshi fehlt auf diesem Mac,
 Systemschrift-Fallback aktiv. Windows-/Linux-CI testet Prozesssteuerung mit
 Testprozessen, keine dortige Inferenz. High-DPI/Screenreader-Abnahme bleibt NX-037.
+
+### NX-043: größere Testaufgaben · 13.11.2026
+
+Die festen Grenzen wurden auf 16384 Kontext-/8192 Ausgabetokens, 12000
+Eingabezeichen und 1800 Sekunden für die UI erhöht. Der Terminalhelfer verwendet
+dasselbe Tokenbudget. Es gibt weiterhin keine konfigurierbaren Modellparameter.
+
+Ein erster Restaurant-Website-Test mit 4096 Kontext-/2048 Ausgabetokens endete
+nach 342,7 Sekunden am Ausgabebudget, noch während des Denktexts/Entwurfs. Daher
+war diese Zwischenkonfiguration für den Anwendungsfall nicht ausreichend.
+Die Laufzeit ist eine Einzelbeobachtung einschließlich Hashprüfung und Laden,
+kein reproduzierbarer Benchmark und keine zugesicherte Antwortzeit.
+
+Der identische Prompt lief mit den endgültigen Grenzen 905,6 Sekunden und
+lieferte 16156 Zeichen, bevor er über „Stoppen“ beendet wurde. Die Oberfläche
+blieb navigierbar, danach war kein Kindprozess aktiv. Eine vollständige finale
+HTML-Antwort wurde nicht erreicht: Die Ausgabe enthielt noch Denktext und
+Entwürfe. Die höheren Grenzen und der Langlauf-Abbruch sind damit geprüft,
+die vollständige Restaurant-Website-Abnahme bleibt offen (NX-043: Review).
+Ein größeres Budget allein behebt das bekannte Reasoning-Verhalten nicht.
+
+Synthetischer Testprompt: „Baue mir eine kleine HTML-Website für ein Restaurant.
+Liefere eine vollständige kompakte HTML-Datei mit eingebettetem CSS, Speisekarte
+und Kontakt. Verwende fiktive Inhalte und keine externen Ressourcen. Halte die
+Datei unter 80 Zeilen.“ Kein generierter Code wurde ausgeführt.
+
+39 Tests mit Qt auf macOS bestanden auch mit den endgültigen Grenzen;
+Compileall, Shell-Syntax und Whitespace geprüft. Stopp, Timeout, Neustart und
+Prozessbereinigung bleiben durch die bestehenden Interaktionstests abgedeckt.
+Die aktualisierte Ansicht mit den neuen Hinweisen wurde visuell geprüft.
 
 ## Start
 

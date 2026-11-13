@@ -22,7 +22,7 @@ fi
 
 exec "$nexus_runtime" \
     --model "$nexus_model" --offline --device MTL0 --n-gpu-layers all \
-    --fit off --ctx-size 1024 --batch-size 128 --ubatch-size 128 --threads 4 \
-    --predict 128 --seed 42 --temp 0 --jinja --conversation --single-turn \
+    --fit off --ctx-size 16384 --batch-size 128 --ubatch-size 128 --threads 4 \
+    --predict 8192 --seed 42 --temp 0 --jinja --conversation --single-turn \
     --reasoning off --no-display-prompt --color off \
     --prompt "${1:-Antworte nur mit: Hallo vom Mac.}"

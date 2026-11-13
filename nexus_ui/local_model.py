@@ -20,7 +20,7 @@ class LocalRunner(QObject):
     finished = Signal(str)
     busy_changed = Signal(bool)
 
-    def __init__(self, parent=None, root=ROOT, timeout_ms=240000):
+    def __init__(self, parent=None, root=ROOT, timeout_ms=1800000):
         super().__init__(parent)
         self.root = Path(root)
         self.runtime = self.root / "local/build/llama-metal/bin/llama-completion"
@@ -57,8 +57,8 @@ class LocalRunner(QObject):
         if self.busy:
             return False
         reason = self.unavailable_reason()
-        if reason or not prompt.strip() or len(prompt) > 4000:
-            self.status.emit(reason or "Bitte eine kurze Frage mit höchstens 4000 Zeichen eingeben.")
+        if reason or not prompt.strip() or len(prompt) > 12000:
+            self.status.emit(reason or "Bitte eine Aufgabe mit höchstens 12000 Zeichen eingeben.")
             return False
         self.busy = True
         self.stop_reason = ""
@@ -77,9 +77,9 @@ class LocalRunner(QObject):
     def _runtime_command(self):
         return str(self.runtime), [
             "--model", str(self.model), "--offline", "--device", "MTL0",
-            "--n-gpu-layers", "all", "--fit", "off", "--ctx-size", "1024",
+            "--n-gpu-layers", "all", "--fit", "off", "--ctx-size", "16384",
             "--batch-size", "128", "--ubatch-size", "128", "--threads", "4",
-            "--predict", "128", "--seed", "42", "--temp", "0", "--jinja",
+            "--predict", "8192", "--seed", "42", "--temp", "0", "--jinja",
             "--conversation", "--single-turn", "--reasoning", "off",
             "--no-display-prompt", "--color", "off", "--file", "/dev/stdin",
         ]
@@ -167,7 +167,7 @@ class LocalRunner(QObject):
             self._finish("Lokaler Modelllauf fehlgeschlagen. Freien Speicher, kurze Eingabe und Metal-Build prüfen.")
         else:
             self.output.emit(self.decoder.decode(b"", final=True))
-            self._finish("Lokaler Lauf beendet · maximal 128 Ausgabetokens." if self.received else
+            self._finish("Lokaler Lauf beendet · maximal 8192 Ausgabetokens." if self.received else
                          "Der lokale Lauf endete ohne Ausgabe.")
 
     def stop(self, reason="Gestoppt. Eingabe bleibt für einen manuellen Neustart erhalten."):
@@ -208,7 +208,7 @@ class LocalModelPage(QWidget):
         self.status.setWordWrap(True)
         layout.addWidget(self.status)
         self.prompt = QPlainTextEdit()
-        self.prompt.setPlaceholderText("Stelle eine kurze Frage …")
+        self.prompt.setPlaceholderText("Zum Beispiel: Baue mir eine kleine HTML-Website für ein Restaurant …")
         self.prompt.setAccessibleName("Frage an das lokale Modell")
         self.prompt.setMaximumHeight(150)
         layout.addWidget(self.prompt)
@@ -223,7 +223,8 @@ class LocalModelPage(QWidget):
         self.output.setReadOnly(True)
         self.output.setAccessibleName("Echte lokale Modellausgabe, einschließlich möglichem Denktext")
         layout.addWidget(self.output, 1)
-        hint = QLabel("Einzelne Fragen ohne Gesprächsverlauf · 1024 Kontexttokens · maximal 128 Ausgabetokens\n"
+        hint = QLabel("Einzelne Aufgaben ohne Gesprächsverlauf · 16384 Kontexttokens · maximal 8192 Ausgabetokens\n"
+                      "Bis 12000 Eingabezeichen · Zeitlimit 30 Minuten einschließlich Modellprüfung\n"
                       "Längere Antworten können abbrechen. Denktext kann sichtbar sein. Eingaben und Antworten werden nicht gespeichert.")
         hint.setWordWrap(True)
         hint.setObjectName("subtitle")

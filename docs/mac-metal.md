@@ -16,16 +16,17 @@ sh scripts/run_mac_model.sh "Was ist die Hauptstadt von Frankreich?"
 
 Die lokale Modelldatei wurde bereits vollständig gegen das Manifest geprüft.
 Das Skript startet einen einzelnen Terminal-Lauf, beendet ihn nach Antwortende
-oder spätestens 128 generierten Tokens und öffnet keinen Server. Abbruch mit
-Ctrl+C. Kontext 1024 Tokens, Batch/UBatch 128, vier CPU-Threads, alle möglichen
-Layer auf `MTL0`, Offline-Modus, Jinja-Template aus dem GGUF, greedy Sampling.
+oder spätestens 8192 generierten Tokens und öffnet keinen Server. Abbruch mit
+Ctrl+C. Seit NX-043: Kontext 16384 Tokens, Batch/UBatch 128, vier CPU-Threads,
+alle möglichen Layer auf `MTL0`, Offline-Modus, Jinja-Template aus dem GGUF,
+greedy Sampling.
 Die Demo-Seiten bleiben simuliert; „Lokales Modell“ erlaubt einen separaten
 echten Modelllauf über die UI.
 
 Bekannte Grenze dieses upstream `llama-completion`-Pfads: Trotz `--reasoning off`
 enthielt die Ausgabe einen Thinking-Abschnitt vor der abschließenden Antwort.
 Die Option ist daher **kein verlässlich nachgewiesener Thinking-Schalter**.
-Mit längeren Prompts kann das 128-Token-Limit eine Antwort abschneiden. Der
+Mit längeren Prompts kann auch das 8192-Token-Limit eine Antwort abschneiden. Der
 Starthelfer ist ein begrenzter Funktionstest, noch kein allgemeiner Chatclient.
 
 ## Reproduzierbarer Build
@@ -68,6 +69,10 @@ Completion-Pfad genügt für NX-005. CMake-Warnungen zu fehlendem OpenMP und
 ARM-Erkennung verhinderten den Metal-Build nicht; kein OpenMP installiert.
 
 ## Tatsächlicher Nachweis
+
+Die folgenden NX-005-Messungen verwendeten die damaligen Grenzen von 1024
+Kontexttokens und 128 Ausgabetokens. Der spätere NX-043-Test mit erhöhten Grenzen
+ist in [desktop.md](desktop.md) separat dokumentiert.
 
 Zwei kurze Läufe mit synthetischem Prompt `Antworte nur mit: Hallo vom Mac.`
 beendeten sich mit Exit 0 und der abschließenden Ausgabe `Hallo vom Mac.`.
