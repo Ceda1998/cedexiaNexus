@@ -149,6 +149,7 @@ class DevicePairingPage(QWidget):
         for widget in (self.source, self.share, self.notice, self.open_source):
             layout.addWidget(widget)
         layout.addStretch()
+        self.interfaces.currentIndexChanged.connect(self.refresh)
         self.code.textChanged.connect(self.refresh)
         self.source.textChanged.connect(self.source_changed)
         self.runner.model_changed.connect(self.selection_changed)
