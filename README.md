@@ -93,7 +93,7 @@ Nutzerauftrag lokal heruntergeladen und verifiziert; es ist nicht Teil von Git.
 
 1. NX-006: Den [nativen Windows-CUDA-Build](docs/windows-cuda.md) nach der
    abgeschlossenen NX-001-Inventur auf dem Home-PC bauen und prüfen.
-2. NX-003: Tatsächliche LAN-Latenz und Bandbreite zwischen beiden Geräten messen.
+2. NX-003: Die [LAN-Messung](docs/lan-benchmark.md) auf beiden Zielgeräten ausführen.
 3. NX-008: Nach NX-006 die Windows-Solo-Baseline messen; danach NX-009 und
    NX-011/012 für den gemeinsamen Rechennachweis.
 

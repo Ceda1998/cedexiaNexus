@@ -26,8 +26,8 @@ dass eine bestimmte Quantisierung gemeinsam passt.
    und Linkstatus sind im Bericht vorgesehen. Die Messung am Zielgerät steht aus.
 2. **NX-002:** Diagnose auf dem MacBook ausführen. macOS, Unified Memory und
    Apple-Silicon-/Metal-Indizien prüfen. Ein Werkzeugfund ist kein Backend-Test.
-3. **NX-003:** Ethernet bevorzugen und tatsächliche LAN-RTT, Linkrate und
-   Nettodurchsatz messen. Internet-Tarif nicht mit LAN-Bandbreite gleichsetzen.
+3. **NX-003:** [LAN-Messung](lan-benchmark.md) mit beiden Zielgeräten ausführen
+   und RTT, Linkrate sowie Nutzdatendurchsatz dokumentieren.
 4. **NX-004:** GGUF-Quelle, Dateiname, Quantisierung, Revision und SHA-256 sowie
    Runtime-Commit festlegen; Modelllizenz prüfen. Downloads sind ein separater
    Auftrag und werden durch diesen Bootstrap nicht ausgeführt.
