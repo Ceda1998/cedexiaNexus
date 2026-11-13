@@ -21,9 +21,9 @@ dass eine bestimmte Quantisierung gemeinsam passt.
 
 ## Reihenfolge für nachfolgende Tickets
 
-1. **NX-001:** Diagnose auf dem Windows-PC ausführen. Genaue CPU, OS, RAM,
-   GPU-/Treiberangaben und CUDA-Toolchain prüfen. Fehlende Werte separat lokal
-   nachmessen; keine Hostnamen oder privaten Netzwerkdaten veröffentlichen.
+1. **NX-001:** [Windows-Inventur](hardware.md#nx-001--windows-pc-erfassen) auf dem
+   Home-PC ausführen. CPU, OS, RAM, GPU, Treiber, CUDA-Toolchain, freier Speicher
+   und Linkstatus sind im Bericht vorgesehen. Die Messung am Zielgerät steht aus.
 2. **NX-002:** Diagnose auf dem MacBook ausführen. macOS, Unified Memory und
    Apple-Silicon-/Metal-Indizien prüfen. Ein Werkzeugfund ist kein Backend-Test.
 3. **NX-003:** Ethernet bevorzugen und tatsächliche LAN-RTT, Linkrate und

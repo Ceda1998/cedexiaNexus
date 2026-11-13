@@ -1,4 +1,61 @@
-# NX-002 · Inventur des aktuellen Macs
+# Hardwareinventur der Zielgeräte
+
+## NX-001 · Windows-PC erfassen
+
+Auf dem physischen Windows-PC in PowerShell aus dem Projektordner ausführen.
+Voraussetzung: Python ab 3.11. Das Skript benötigt keine zusätzlichen
+Python-Pakete oder Administratorrechte.
+
+```powershell
+py -3 -m scripts.inventory_windows
+```
+
+Falls der Python-Launcher fehlt, `python -m scripts.inventory_windows`
+verwenden. Der JSON-Bericht erscheint im Terminal. Falls eine Datei gebraucht
+wird, im Projektordner unter dem ignorierten Verzeichnis `reports/` ablegen:
+
+```powershell
+New-Item -ItemType Directory -Force reports | Out-Null
+py -3 -m scripts.inventory_windows > reports/nx-001-windows.json
+```
+
+| Berichtsfeld | Bedeutung |
+| --- | --- |
+| OS, CPU, RAM | Windows-Edition, Version, Build inklusive Update-Revision (soweit lesbar), CPU-Modell und physischer RAM; freier physischer RAM als Momentaufnahme |
+| GPU | Windows-CIM-Gerät und dessen Treiber; NVIDIA-Modell, Treiber und VRAM in MiB separat aus `nvidia-smi`, wenn verfügbar. CIM-Treiberversion und NVIDIA-Versionsnummer haben unterschiedliche Formate. |
+| Datenträger | Freie Bytes auf dem Laufwerk des Repositorys bzw. des entpackten Diagnosepakets; bei einem anderen Modelllaufwerk dort separat prüfen |
+| Netzwerkschnittstellen | Physische Adapter nach Typ, Verbindungsstatus und gemeldeter RX-/TX-Linkrate; Linkrate ist kein gemessener Durchsatz zum Mac (NX-003). |
+| CUDA und WSL | Werkzeuge im PATH, CUDA-Toolkit-Release aus `nvcc --version`, Zustand der Windows-Funktionen für WSL und Virtual Machine Platform, soweit abfragbar |
+
+Der Bericht enthält keine Hostnamen, Benutzerpfade, Adapter-Aliasse, IP- oder
+MAC-Adressen, Seriennummern oder WSL-Distributionsnamen. Fehlende Messwerte
+erscheinen als `unknown`. Ein `false` unter `tools_on_path` bedeutet, dass das
+Werkzeug in dieser Shell nicht gefunden wurde; insbesondere kann `cl` erst
+in einer Visual-Studio-Entwicklerkonsole sichtbar sein.
+
+**Backend-Pfade:** Zuerst nativer Windows-CUDA-Build in NX-006. WSL2 ist eine
+Fallback-Option, falls der native Pfad ungeeignet ist; dafür sind der Windows-Treiber
+und die CUDA-Umgebung in WSL getrennt zu prüfen. WSL-Funktionsstatus und
+Werkzeugfunde belegen keinen funktionierenden Build oder eine lauffähige
+Distribution. Natives Linux bleibt ein separater, bisher ungeprüfter Pfad.
+Keine Distribution wird gestartet und keine Konfiguration geändert.
+
+Quellen: [Windows-Speicherdaten](https://learn.microsoft.com/en-us/windows/win32/cimwin32prov/win32-operatingsystem),
+[Windows-Adapterfelder](https://learn.microsoft.com/en-us/previous-versions/windows/desktop/legacy/hh968170(v=vs.85)),
+[Windows-Funktionsstatus](https://learn.microsoft.com/en-us/windows/win32/cimwin32prov/win32-optionalfeature),
+[NVIDIA: CUDA unter WSL](https://docs.nvidia.com/cuda/wsl-user-guide/).
+
+**Abnahme:** Die Erfassung ist implementiert; die Messung auf dem Home-PC
+steht aus. Die Angaben Ryzen 7, RTX 5070 Ti (16 GB VRAM) und 32 GB RAM
+stammen bisher vom Nutzer. Den erzeugten Bericht zur Prüfung bereitstellen,
+bevor NX-001 als abgeschlossen gilt.
+
+Lokal auf macOS: 46 Tests bestanden, darunter vier gezielte Tests mit
+simulierten Windows-Antworten. Der direkte Aufruf auf macOS meldet
+`Windows required` mit Exitcode 2. Die GitHub-CI enthält einen zusätzlichen
+CIM-Smoke-Test für Windows; er ersetzt die Inventur des Home-PCs nicht.
+
+## NX-002 · Inventur des aktuellen Macs
 
 Erfasst am 12.11.2026 mit `python3 -m scripts.inventory_mac` auf dem lokalen
 Mac. Das Skript schreibt nur ausgewählte Felder auf stdout; keine Seriennummern,
