@@ -78,3 +78,27 @@ class ModelVerificationTests(unittest.TestCase):
                     status = verify_model.main([str(self.path), "--gguf"])
                 self.assertEqual(status, int(error is not None))
                 self.assertEqual(json.loads(output.getvalue()), {"header_ok": error is None, "error": error})
+
+    def test_split_fingerprint_includes_every_part_and_checks_metadata(self):
+        def shard(index):
+            fields = ((b"split.no", index), (b"split.count", 2))
+            metadata = b"".join(struct.pack("<Q", len(key)) + key + struct.pack("<IH", 2, value)
+                                for key, value in fields)
+            return struct.pack("<4sIQQ", b"GGUF", 3, 1, len(fields)) + metadata + bytes(128)
+
+        first = self.path.with_name("model-00001-of-00002.gguf")
+        second = self.path.with_name("model-00002-of-00002.gguf")
+        first.write_bytes(shard(0))
+        second.write_bytes(shard(1))
+        original = verify_model.fingerprint_gguf(first)
+        self.assertEqual(original["parts"], 2)
+        second.write_bytes(shard(1) + b"changed")
+        self.assertNotEqual(verify_model.fingerprint_gguf(first)["sha256"], original["sha256"])
+        with self.assertRaises(ValueError):
+            verify_model.fingerprint_gguf(second)
+        self.path.write_bytes(shard(0))
+        with self.assertRaises(ValueError):
+            verify_model.fingerprint_gguf(self.path)
+        second.unlink()
+        with self.assertRaises(ValueError):
+            verify_model.fingerprint_gguf(first)

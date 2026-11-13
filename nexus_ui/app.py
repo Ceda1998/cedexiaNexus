@@ -1,4 +1,4 @@
-"""Desktop prototype with separate demo pages and explicit local inference."""
+"""Desktop app with LAN pairing, local inference and separate demo pages."""
 from pathlib import Path
 import sys
 
@@ -10,7 +10,9 @@ from PySide6.QtWidgets import (
     QPushButton, QStackedWidget, QScrollArea, QFrame, QComboBox,
     QPlainTextEdit, QSpinBox, QMessageBox,
 )
+from .device_pairing import DevicePairingPage
 from .local_model import LocalModelPage
+from .pairing_transport import host_context
 
 ASSETS = Path(__file__).parent / "assets"
 STYLE = """
@@ -27,9 +29,9 @@ QPushButton:checked { background: #EAF0F8; border-left: 3px solid #173B70; }
 QPushButton[primary="true"] { background: #173B70; color: white; }
 QPushButton[primary="true"]:hover { background: #102C55; }
 QPushButton:disabled { background: #EEF0F3; color: #626D7D; border-color: #C8CED8; }
-QPushButton:focus, QComboBox:focus, QPlainTextEdit:focus, QSpinBox:focus {
+QPushButton:focus, QComboBox:focus, QPlainTextEdit:focus, QSpinBox:focus, QLineEdit:focus {
  border: 2px solid #173B70; }
-QComboBox, QSpinBox { background: white; padding: 8px; min-height: 28px;
+QComboBox, QSpinBox, QLineEdit { background: white; padding: 8px; min-height: 28px;
  border: 1px solid #8B9DB5; border-radius: 0px; }
 QPlainTextEdit { background: white; border: 1px solid #8B9DB5; padding: 12px; }
 """
@@ -73,7 +75,7 @@ def button(text, callback, name=None, primary=False):
 class NexusWindow(QMainWindow):
     def __init__(self, local_runner=None):
         super().__init__()
-        self.setWindowTitle("Cedexia Nexus · Lokales Modell & Demo")
+        self.setWindowTitle("Cedexia Nexus")
         self.closing = False
         self.resize(1200, 850)
         self.setMinimumSize(800, 600)
@@ -104,7 +106,7 @@ class NexusWindow(QMainWindow):
         self.nav = []
         for i, (title, name) in enumerate([
             ("Übersicht", "layout-dashboard"), ("Einrichtung", "checklist"),
-            ("Geräte", "devices"), ("Demo-Sitzung", "message"),
+            ("Geräte verbinden", "devices"), ("Demo-Sitzung", "message"),
             ("Lokales Modell", "player-play"), ("Über Nexus", "settings"),
         ]):
             nav = button(title, lambda checked=False, index=i: self.navigate(index), name)
@@ -114,11 +116,18 @@ class NexusWindow(QMainWindow):
         navigation.addStretch()
         self.overview()
         self.setup()
-        self.devices()
-        self.session()
         self.local_model = LocalModelPage(runner=local_runner)
+        self.pairing = DevicePairingPage(self.local_model.runner)
+        self.pairing.select.clicked.connect(lambda: self.navigate(4))
+        self.pairing.idle.connect(self.finish_closing)
+        pairing_scroll = QScrollArea()
+        pairing_scroll.setWidgetResizable(True)
+        pairing_scroll.setFrameShape(QFrame.Shape.NoFrame)
+        pairing_scroll.setWidget(self.pairing)
+        self.stack.addWidget(pairing_scroll)
+        self.session()
         self.stack.addWidget(self.local_model)
-        self.local_model.runner.finished.connect(self.local_finished)
+        self.local_model.runner.finished.connect(self.finish_closing)
         self.about()
         self.navigate(0)
         self.refresh()
@@ -154,36 +163,19 @@ class NexusWindow(QMainWindow):
         layout = self.page("Rechenleistung verbinden.", "Zwei Geräte. Eine lokale KI-Sitzung — als Ablaufvorschau.")
         self.summary = self.panel(layout, "Dein Arbeitsbereich", "")
         self.panel(layout, "Gemeinsame Berechnung", "Diese Vorschau ist simuliert. Die Einzelgeräte-Ansicht findest du unter ‚Lokales Modell‘.")
+        layout.addWidget(button("Geräte verbinden", lambda: self.navigate(2), "devices"))
         layout.addWidget(button("Lokales Modell öffnen", lambda: self.navigate(4), "player-play", True))
         layout.addWidget(button("Einrichtung öffnen", lambda: self.navigate(1), "checklist", True))
         layout.addStretch()
 
     def setup(self):
-        layout = self.page("In wenigen Schritten bereit.", "Alle folgenden Aktionen verändern ausschließlich den Demo-Zustand.")
+        layout = self.page("In wenigen Schritten bereit.", "Geräte- und Modellprüfung auf dieser Seite sind simuliert.")
         self.setup_status = self.panel(layout, "01 / Dieses Gerät", "Noch nicht geprüft")
         layout.addWidget(button("Geräteprüfung simulieren", self.check_device, "checklist", True))
         self.model_status = self.panel(layout, "02 / Modell", "Kein Demo-Modell vorbereitet")
         layout.addWidget(button("Modellprüfung simulieren", self.prepare_model, "checklist"))
-        layout.addWidget(button("03 / Zweites Gerät ansehen", lambda: self.navigate(2), "devices"))
+        layout.addWidget(button("03 / Zweites Gerät verbinden", lambda: self.navigate(2), "devices"))
         layout.addWidget(button("04 / Zur Sitzung", lambda: self.navigate(3), "message"))
-        layout.addStretch()
-
-    def devices(self):
-        layout = self.page("Deine Geräte.", "Beispielprofile. RAM, VRAM und Unified Memory werden getrennt betrachtet.")
-        self.panel(layout, "Mac · Beispielprofil", "32 GiB Unified Memory · Freier Speicher hier nicht ermittelt\nDer lokale M5-Metal-Test ist separat unter ‚Lokales Modell‘ verfügbar.")
-        self.peer_status = self.panel(layout, "Windows-PC · Beispielprofil", "")
-        layout.addWidget(button("Freigabe auf beiden Geräten simulieren", self.pair_peer, "devices"))
-        layout.addWidget(button("Zweites Gerät trennen (Demo)", self.disconnect_peer, "devices"))
-        self.limit = QSpinBox()
-        self.limit.setRange(1, 24)
-        self.limit.setValue(16)
-        self.limit.setSuffix(" GiB")
-        caption = label("Geplantes RAM-Limit für Windows (Demo, nicht wirksam)")
-        caption.setBuddy(self.limit)
-        self.limit.setAccessibleName("Geplantes RAM-Limit, nur Demo")
-        layout.addWidget(caption)
-        layout.addWidget(self.limit)
-        layout.addWidget(label("Das Limit wird nur in dieser Sitzung angezeigt. Eine Durchsetzung im Backend ist nicht implementiert.", "subtitle"))
         layout.addStretch()
 
     def session(self):
@@ -195,6 +187,19 @@ class NexusWindow(QMainWindow):
         mode_label.setBuddy(self.mode)
         layout.addWidget(mode_label)
         layout.addWidget(self.mode)
+        demo_devices = QHBoxLayout()
+        demo_devices.addWidget(button("Freigabe simulieren", self.pair_peer, "devices"))
+        demo_devices.addWidget(button("Trennen simulieren", self.disconnect_peer, "devices"))
+        layout.addLayout(demo_devices)
+        self.limit = QSpinBox()
+        self.limit.setRange(1, 24)
+        self.limit.setValue(16)
+        self.limit.setSuffix(" GiB")
+        caption = label("Geplantes RAM-Limit für Windows (Demo)")
+        caption.setBuddy(self.limit)
+        self.limit.setAccessibleName("Geplantes RAM-Limit, nur Demo")
+        layout.addWidget(caption)
+        layout.addWidget(self.limit)
         self.session_status = label("", "banner")
         layout.addWidget(self.session_status)
         self.prompt = QPlainTextEdit()
@@ -223,7 +228,7 @@ class NexusWindow(QMainWindow):
         layout = self.page("Über Nexus.", "Desktop-Demo und lokaler Modelltest")
         self.panel(layout, "Darstellung", "Dunkelblau #173B70 · Eckige Komponenten · Satoshi lokal\nTabler Icons Outline v3.35.0 · MIT")
         layout.addWidget(button("Tabler-Lizenz anzeigen", self.show_license, "settings"))
-        self.panel(layout, "Daten", "Demo-Seiten sind simuliert. ‚Lokales Modell‘ verarbeitet deine Frage mit den vorhandenen lokalen Gewichten. Kein Netzwerk und kein Speichern von Eingaben oder Antworten.")
+        self.panel(layout, "Daten", "‚Lokales Modell‘ verarbeitet Eingaben offline. ‚Geräte verbinden‘ tauscht Modellstatus und optionale Bezugsquellen mit dem eingeladenen Gerät im LAN aus.")
         layout.addStretch()
 
     def show_license(self):
@@ -235,8 +240,11 @@ class NexusWindow(QMainWindow):
 
     def navigate(self, index):
         self.stack.setCurrentIndex(index)
-        self.banner.setText("LOKAL · Modelltest auf diesem Gerät" if index == 4 else
-                            "DEMO · Diese Ablaufseiten sind simuliert; echte Inferenz unter ‚Lokales Modell‘")
+        self.banner.setText({
+            2: "LAN · Geräte koppeln und GGUF-Gewichte abgleichen",
+            4: "LOKAL · Modelltest auf diesem Gerät",
+            5: "INFO · Cedexia Nexus",
+        }.get(index, "DEMO · Simulierter Ablauf"))
         for i, nav in enumerate(self.nav):
             nav.setChecked(index == i)
 
@@ -279,8 +287,6 @@ class NexusWindow(QMainWindow):
                              f"Modell: {'Prüfung simuliert' if self.model_ready else 'nicht vorbereitet'}")
         self.setup_status.setText("Prüfung simuliert. Keine realen Hardwarewerte erhoben." if self.checked else "Noch nicht geprüft")
         self.model_status.setText("Demo-Modell vorbereitet. Keine Datei geladen oder geprüft." if self.model_ready else "Kein Demo-Modell vorbereitet")
-        self.peer_status.setText("32 GiB RAM / 16 GiB VRAM · CUDA nicht getestet\n" +
-                                 ("Freigabe simuliert" if self.paired else "Nicht freigegeben"))
         missing = self.blockers()
         self.start.setEnabled(not missing and not self.running)
         self.stop.setEnabled(self.running)
@@ -325,15 +331,16 @@ class NexusWindow(QMainWindow):
 
     def closeEvent(self, event):
         self.timer.stop()
-        if self.local_model.runner.busy:
+        if self.local_model.runner.busy or self.pairing.busy:
             self.closing = True
             event.ignore()
+            self.pairing.close_session()
             self.local_model.runner.stop("Fenster geschlossen; lokaler Prozess beendet.")
             return
         super().closeEvent(event)
 
-    def local_finished(self, _):
-        if self.closing:
+    def finish_closing(self, *_):
+        if self.closing and not self.pairing.busy and not self.local_model.runner.busy:
             self.close()
 
 
@@ -352,8 +359,10 @@ def make_application():
 
 def main(smoke=False):
     app, font_loaded = make_application()
+    if smoke:
+        host_context()
     window = NexusWindow()
-    window.navigate(4)
+    window.navigate(2 if smoke else 4)
     if not font_loaded:
         window.font_notice.setText("Satoshi fehlt · Systemschrift aktiv. Einrichtung siehe docs/desktop.md.")
     window.show()
