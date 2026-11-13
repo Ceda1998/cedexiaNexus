@@ -361,6 +361,8 @@ def main(smoke=False):
     app, font_loaded = make_application()
     if smoke:
         host_context()
+        from mcp import Client
+        Client('https://example.invalid/mcp')
     from .workspace import Workspace
     window = Workspace()
     window.show()

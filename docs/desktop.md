@@ -3,8 +3,9 @@
 ## Projekt- und Chatoberfläche
 
 NX-054 und NX-055 öffnen die App mit einer einklappbaren Sidebar, Projekten und
-Chats. Der Composer unten enthält die GGUF-Auswahl, Diktateinstieg, Senden und
-Stoppen. Nachrichten werden pro Chat in einer SQLite-Datenbank im lokalen
+Chats. Der Composer unten enthält die Modellauswahl, MCPs, Skills, Diktateinstieg,
+Senden und Stoppen. GGUF-Dateien werden unter **Einstellungen → Modelle** hinzugefügt.
+Nachrichten werden pro Chat in einer SQLite-Datenbank im lokalen
 App-Datenverzeichnis gespeichert. Beim Neustart öffnet sich der zuletzt
 angelegte Chat. Chats lassen sich nach Bestätigung löschen. Die Datenbank ist
 unverschlüsselt und unterliegt dem Zugriffsschutz des Benutzerkontos.
@@ -17,8 +18,8 @@ Bilder werden nicht geladen. Der Kopierbutton kopiert die letzte Antwort.
 
 **Einstellungen** öffnet ein separates Fenster mit Schriftgröße, hellem/dunklem
 Erscheinungsbild, Kontext- und Ausgabetokens, Reasoning-Anforderung, lokalen
-Prompt-Anweisungen und Geräteverwaltung. Parameter gelten ab dem nächsten
-Modellstart und sind derzeit global. Skills sind hier editierbare Anweisungen.
+Skills, MCP-Verbindungen und Geräteverwaltung. Modellparameter gelten ab dem nächsten
+Modellstart und sind derzeit global. Skills und MCP-Freigaben gelten pro Chat.
 Der Diktatbutton erklärt den Einstieg in die Systemdiktierfunktion. Eine eigene
 Audioaufnahme oder Transkriptionsruntime ist noch offen.
 
@@ -34,6 +35,52 @@ offline Textinferenz aus. Für Windows
 liefert NX-052 ein Paket mit derselben Ansicht und CUDA als Backend.
 Beide Apps merken sich die hinzugefügten Modellpfade und die letzte Auswahl.
 Prompts und Antworten bleiben im Speicher.
+
+## Skills und MCPs (NX-057)
+
+Unter **Einstellungen → Skills** können UTF-8-Markdown-Dateien (`.md`, auch
+`SKILL.md`, bis 128 KiB) importiert, neu erstellt, bearbeitet und gelöscht werden.
+Speichern übernimmt die Änderungen; der Import kopiert den Inhalt in die lokale
+Chatdatenbank und verändert die Quelldatei nicht. Unter dem Chat aktiviert
+**Skills** die gewünschten Einträge für diesen Chat. Ihr Markdown wird jeder
+folgenden Nachricht als Anweisung vorangestellt. Alte lokale Anweisungen werden
+einmalig als Skill übernommen und für bereits vorhandene Chats aktiviert.
+Neue Chats beginnen ohne aktive Skills. Frontmatter bleibt erhalten; verlinkte
+Dateien und ausführbare Skripte aus Skillpaketen werden nicht ausgeführt.
+
+Unter **Einstellungen → MCPs** eine Verbindung benennen, konfigurieren und speichern:
+
+- **stdio:** vollständiger Pfad zu einem bereits installierten Programm wie Python
+  oder Node und Argumente als JSON-Array. Kein Shellkommando, kein automatischer
+  Download oder Paketinstallationsschritt; Windows-Batchdateien werden nicht gestartet.
+- **http:** vollständige Streamable-HTTP-MCP-Adresse über HTTPS. HTTP ist nur für
+  Loopback-Server zulässig. Ein optionaler Bearer-Token bleibt im Arbeitsspeicher
+  und wird beim Trennen gelöscht. OAuth-Anmeldung und ältere SSE-Transporte sind
+  noch nicht unterstützt. Zugangsdaten gehören nicht in URL oder Argumente.
+
+**Verbinden** startet die lokale stdio-Sitzung beziehungsweise verbindet den
+HTTP-Client und lädt die Werkzeugliste. Unter dem Chat **MCPs** den Server für
+diesen Chat aktivieren. **Werkzeuge aufrufen** öffnet die Liste mit Beschreibung,
+JSON-Schema und Argumenteingabe. Jeder Aufruf erfolgt ausdrücklich per Button;
+das lokale Modell startet keine selbstständige Werkzeugschleife. Nur eine
+MCP-Sitzung ist gleichzeitig verbunden. Deaktivieren verhindert neue Aufrufe,
+**Trennen** beendet auch die Sitzung. Bereits gestartete Aktionen können beim
+Server schon ausgeführt worden sein und werden durch Trennen nicht zurückgenommen.
+
+Ein Ergebnis kann bearbeitet und mit **Ergebnis als Kontext in diesen Chat
+übernehmen** für die nächste Nachricht bereitgestellt werden. Ergebnisse aus
+anderen Chats oder deaktivierten Verbindungen werden nicht übernommen. Die
+letzte Übernahme ersetzt den vorgemerkten Kontext; Chatwechsel verwirft ihn.
+Das Gesamtlimit von 12000 Zeichen umfasst auch Skills und Werkzeugkontext.
+MCP-Ergebnisse sind externe Daten; nur bewusst ausgewählte Inhalte übernehmen.
+Serverprogramme und Werkzeuge laufen mit den Rechten des Benutzerkontos.
+Gespeicherte Konfigurationen und Markdown liegen unverschlüsselt in der lokalen
+Chatdatenbank. Es wird kein MCP-Server durch Cedexia Nexus veröffentlicht.
+
+Validierung auf macOS: reale stdio- und Loopback-HTTP-Testserver mit Discovery,
+Toolaufruf und Sitzungsende; Markdown-Import, Editor, Migration, Persistenz,
+Chatfreigaben und Übergabe an den Inferenzprozess. Die Tests benötigen keine
+Modellgewichte und belegen keine Modellqualität oder verteilte Inferenz.
 
 ## Geräte im LAN verbinden
 

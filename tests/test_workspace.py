@@ -30,6 +30,9 @@ class WorkspaceTests(unittest.TestCase):
             window = Workspace(runner, str(path / 'chats.db'))
             window.create_chat()
             identifier = window.chat_id
+            skill = window.integrations.save_skill(None, 'Testskill', 'Nutze das Wort Nexus.')
+            window.activate_integration('skills', skill, True)
+            self.assertFalse(hasattr(window, 'import_model'))
             window.prompt.setPlainText('Hallo Welt')
             window.send.click()
             self.assertFalse(window.tree.isEnabled())
@@ -39,6 +42,7 @@ class WorkspaceTests(unittest.TestCase):
                 time.sleep(.01)
             self.assertFalse(runner.busy)
             self.assertIn('Hallo Welt', window.messages[-1]['text'])
+            self.assertIn('Nutze das Wort Nexus.', window.messages[-1]['text'])
             window.open_settings()
             window.mode.setCurrentIndex(1)
             window.prompt.setPlainText('Test')

@@ -10,10 +10,11 @@ from PySide6.QtGui import QDesktopServices, QTextDocument
 from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QPushButton, QLabel, QComboBox, QTreeWidget, QTreeWidgetItem, QPlainTextEdit,
     QTextBrowser, QDialog, QTabWidget, QFormLayout, QSpinBox, QCheckBox,
-    QInputDialog, QMessageBox, QFileDialog)
+    QInputDialog, QMessageBox, QFileDialog, QMenu, QScrollArea)
 
 from .local_model import LocalRunner
 from .device_pairing import DevicePairingPage
+from .integrations import IntegrationStore, SkillEditor, McpPanel
 
 
 class ChatBrowser(QTextBrowser):
@@ -58,6 +59,8 @@ class Workspace(QMainWindow):
         self.settings = self.runner.settings
         path = storage or str(Path(QStandardPaths.writableLocation(QStandardPaths.StandardLocation.AppLocalDataLocation)) / 'CedexiaNexus' / 'chats.sqlite3')
         self.store = ChatStore(path)
+        self.integrations = IntegrationStore(self.store.db, self.settings)
+        self.pending_context = ''
         self.chat_id = None
         self.messages = []
         self.closing = False
@@ -117,7 +120,8 @@ class Workspace(QMainWindow):
         self.models = QComboBox()
         self.models.setAccessibleName('Modell für diesen Chat')
         composer.addWidget(self.models, 1)
-        self.import_model = self.button('+ GGUF', self.pick_model, composer)
+        self.mcp_button = self.button('MCPs', lambda: self.integration_menu('mcps'), composer)
+        self.skill_button = self.button('Skills', lambda: self.integration_menu('skills'), composer)
         self.dictate = self.button('Diktieren', self.dictation, composer)
         self.send = self.button('Senden', self.submit, composer)
         self.send.setProperty('primary', True)
@@ -129,13 +133,17 @@ class Workspace(QMainWindow):
         device_layout = QVBoxLayout(self.devices)
         self.pairing = DevicePairingPage(self.runner)
         device_layout.addWidget(self.pairing)
-        self.pairing.select.clicked.connect(self.pick_model)
+        self.pairing.select.clicked.connect(lambda: self.open_settings('Modelle'))
         self.pairing.idle.connect(self.finish_close)
         self.device_timer = QTimer(self, interval=500)
         self.device_timer.timeout.connect(self.connection_state)
         self.device_timer.start()
         self.was_connected = False
         self.preferences = None
+        self.mcp_panel = McpPanel(self.integrations, lambda: self.chat_id, lambda: not self.runner.busy and not self.closing)
+        self.mcp_panel.context_ready.connect(self.set_context)
+        self.mcp_panel.idle.connect(self.finish_close)
+        self.mcp_panel.changed.connect(self.refresh_integrations)
         self.runner.output.connect(self.append_output)
         self.runner.finished.connect(self.finished)
         self.runner.status.connect(self.status.setText)
@@ -205,9 +213,11 @@ class Workspace(QMainWindow):
         self.chat_id = identifier
         self.title.setText(row[0])
         self.messages = json.loads(row[1])
+        self.pending_context = ''
         self.prompt.clear()
         self.refresh_tree()
         self.render()
+        self.refresh_integrations()
 
     def select_chat(self, current, previous):
         if current and current.data(0, Qt.ItemDataRole.UserRole)[0] == 'chat':
@@ -216,9 +226,11 @@ class Workspace(QMainWindow):
     def remove_chat(self):
         if self.chat_id and QMessageBox.question(self, 'Chat löschen', 'Diesen lokal gespeicherten Chat löschen?') == QMessageBox.StandardButton.Yes:
             with self.store.db:
+                self.store.db.execute('DELETE FROM chat_integrations WHERE chat=?', (self.chat_id,))
                 self.store.db.execute('DELETE FROM chats WHERE id=?', (self.chat_id,))
             self.chat_id = None
             self.messages = []
+            self.pending_context = ''
             self.refresh_tree()
             self.render()
 
@@ -236,6 +248,8 @@ class Workspace(QMainWindow):
             self.runner.select_model(self.models.itemData(index))
 
     def pick_model(self):
+        if self.runner.busy:
+            return
         paths, _ = QFileDialog.getOpenFileNames(self, 'Lokale Modelle', '', 'GGUF (*.gguf)')
         for path in paths:
             self.runner.select_model(path)
@@ -265,9 +279,9 @@ class Workspace(QMainWindow):
         text = self.prompt.toPlainText().strip()
         if not text:
             return
-        skill = self.settings.value('skill_text', '', type=str)
+        skill = self.integrations.skill_prompt(self.chat_id)
         history = '\n\n'.join(('Nutzer' if m['role'] == 'user' else 'Assistent') + ': ' + m['text'] for m in self.messages)
-        prompt = '\n\n'.join(part for part in (skill, history, 'Nutzer: ' + text) if part)
+        prompt = '\n\n'.join(part for part in (skill, history, self.pending_context, 'Nutzer: ' + text) if part)
         if len(prompt) > 12000:
             self.status.setText('Der Verlauf überschreitet 12000 Zeichen. Beginne einen neuen Chat.')
             return
@@ -279,6 +293,7 @@ class Workspace(QMainWindow):
             del self.messages[-2:]
             return
         self.prompt.clear()
+        self.pending_context = ''
         self.store.save(self.chat_id, self.messages)
         self.render()
 
@@ -311,7 +326,7 @@ class Workspace(QMainWindow):
 
     def refresh(self, *_):
         busy = self.runner.busy
-        for widget in (self.tree, self.new_project, self.new_chat, self.delete_chat, self.models, self.import_model, self.mode):
+        for widget in (self.tree, self.new_project, self.new_chat, self.delete_chat, self.models, self.skill_button, self.mcp_button, self.mode):
             widget.setEnabled(not busy)
         self.prompt.setReadOnly(busy)
         self.send.setEnabled(not busy and self.mode.currentIndex() == 0 and bool(self.prompt.toPlainText().strip()) and not self.runner.unavailable_reason())
@@ -350,13 +365,14 @@ class Workspace(QMainWindow):
             QTreeWidget::item:selected {{ background: #173B70; color: white; }}
             QTreeWidget::item {{ padding: 8px; }}''')
 
-    def open_settings(self):
+    def open_settings(self, section=None):
         if self.preferences is None:
             self.preferences = QDialog(self)
             self.preferences.setWindowTitle('Einstellungen · Cedexia Nexus')
             self.preferences.resize(860, 680)
             layout = QVBoxLayout(self.preferences)
             tabs = QTabWidget()
+            self.settings_tabs = tabs
             layout.addWidget(tabs)
             appearance = QWidget()
             form = QFormLayout(appearance)
@@ -391,21 +407,58 @@ class Workspace(QMainWindow):
             self.button('Systemdiktat verwenden', self.dictation, speech_layout)
             speech_layout.addStretch()
             tabs.addTab(speech, 'Spracheingabe')
-            skills = QWidget()
-            skills_layout = QVBoxLayout(skills)
-            skills_layout.addWidget(QLabel('Lokale Anweisungen für neue Nachrichten'))
-            instructions = QPlainTextEdit(self.settings.value('skill_text', '', type=str))
-            instructions.textChanged.connect(lambda: self.settings.setValue('skill_text', instructions.toPlainText()[:4000]))
-            skills_layout.addWidget(instructions)
+            skills = SkillEditor(self.integrations)
+            skills.changed.connect(self.refresh_integrations)
             tabs.addTab(skills, 'Skills')
+            mcp_scroll = QScrollArea()
+            mcp_scroll.setWidgetResizable(True)
+            mcp_scroll.setWidget(self.mcp_panel)
+            tabs.addTab(mcp_scroll, 'MCPs')
             devices = QWidget()
             devices_layout = QVBoxLayout(devices)
             self.button('Geräteverbindung verwalten', self.open_devices, devices_layout)
             devices_layout.addStretch()
             tabs.addTab(devices, 'Geräte')
             self.button('Erweiterte Modellprüfung und Demo öffnen', self.open_advanced, layout)
+        if section:
+            for index in range(self.settings_tabs.count()):
+                if self.settings_tabs.tabText(index) == section:
+                    self.settings_tabs.setCurrentIndex(index)
         self.preferences.show()
         self.preferences.raise_()
+
+    def refresh_integrations(self):
+        self.skill_button.setText(f'Skills ({len(self.integrations.active(self.chat_id, "skills"))})')
+        self.mcp_button.setText(f'MCPs ({len(self.integrations.active(self.chat_id, "mcps"))})')
+
+    def integration_menu(self, kind):
+        if not self.chat_id:
+            draft = self.prompt.toPlainText()
+            self.create_chat()
+            self.prompt.setPlainText(draft)
+        menu = QMenu(self)
+        active = self.integrations.active(self.chat_id, kind)
+        for identifier, name in self.store.db.execute(f'SELECT id,name FROM {kind} ORDER BY name'):
+            item = menu.addAction(name)
+            item.setCheckable(True)
+            item.setChecked(identifier in active)
+            item.toggled.connect(lambda enabled, i=identifier: self.activate_integration(kind, i, enabled))
+        menu.addSeparator()
+        menu.addAction('Verwalten …', lambda: self.open_settings('Skills' if kind == 'skills' else 'MCPs'))
+        if kind == 'mcps':
+            menu.addAction('Werkzeuge aufrufen …', lambda: self.open_settings('MCPs'))
+        button = self.skill_button if kind == 'skills' else self.mcp_button
+        menu.exec(button.mapToGlobal(button.rect().bottomLeft()))
+
+    def activate_integration(self, kind, identifier, enabled):
+        self.integrations.activate(self.chat_id, kind, identifier, enabled)
+        if kind == 'mcps' and not enabled:
+            self.pending_context = ''
+        self.refresh_integrations()
+
+    def set_context(self, text):
+        self.pending_context = text
+        self.status.setText('MCP-Ergebnis wird bei der nächsten Nachricht mitgesendet.')
 
     def forget_model(self):
         self.runner.remove_model()
@@ -419,10 +472,11 @@ class Workspace(QMainWindow):
         self.advanced.raise_()
 
     def closeEvent(self, event):
-        if self.runner.busy or self.pairing.busy:
+        if self.runner.busy or self.pairing.busy or self.mcp_panel.connection:
             self.closing = True
             self.runner.stop()
             self.pairing.close_session()
+            self.mcp_panel.disconnect()
             event.ignore()
             return
         self.devices.close()
@@ -435,5 +489,5 @@ class Workspace(QMainWindow):
         event.accept()
 
     def finish_close(self, *_):
-        if self.closing and not self.runner.busy and not self.pairing.busy:
+        if self.closing and not self.runner.busy and not self.pairing.busy and not self.mcp_panel.connection:
             self.close()
