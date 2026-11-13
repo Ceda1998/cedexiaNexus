@@ -1,0 +1,9 @@
+NX-001: Windows-Inventur
+
+ZIP auf dem Windows-PC auf dem fuer Nexus vorgesehenen Laufwerk entpacken.
+PowerShell im entpackten Ordner oeffnen. Python ab 3.11 vorausgesetzt.
+
+py -3 -m scripts.inventory_windows
+
+Den JSON-Bericht aus dem Terminal zur Pruefung weitergeben.
+Details: docs/hardware.md
