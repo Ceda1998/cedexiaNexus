@@ -39,17 +39,28 @@ class WindowsCudaTests(unittest.TestCase):
             root = Path(directory)
             (root / ".git").mkdir()
             runtime = root / "llama-completion.exe"
+            rpc_dir = root / "rpc"
+            (rpc_dir / "bin").mkdir(parents=True)
+            (rpc_dir / "bin/ggml-rpc-server.exe").touch()
             runtime.touch()
             with (
                 patch.object(windows_cuda, "SOURCE", root),
                 patch.object(windows_cuda, "RUNTIME", runtime),
+                patch.object(windows_cuda, "RPC_BUILD", rpc_dir),
                 patch.object(windows_cuda.shutil, "which", side_effect=lambda tool: str(root / tool)),
                 patch.object(windows_cuda, "capture", side_effect=capture),
                 patch.object(windows_cuda.subprocess, "run") as run,
             ):
                 windows_cuda.build(revision)
-        self.assertIn("-DCMAKE_CUDA_ARCHITECTURES=120a-real", run.call_args_list[0].args[0])
-        self.assertIn("--build", run.call_args_list[1].args[0])
+                windows_cuda.build(revision, rpc=True)
+        solo_configure, solo_build, rpc_configure, rpc_build = [call.args[0] for call in run.call_args_list]
+        self.assertIn("-DCMAKE_CUDA_ARCHITECTURES=120a-real", solo_configure)
+        self.assertIn("-DGGML_RPC=OFF", solo_configure)
+        self.assertIn("llama-completion", solo_build)
+        self.assertIn(str(rpc_dir), rpc_configure)
+        self.assertIn("-DGGML_RPC=ON", rpc_configure)
+        self.assertIn("-DGGML_RPC_RDMA=OFF", rpc_configure)
+        self.assertIn("ggml-rpc-server", rpc_build)
 
     def test_device_list_keeps_only_cuda_entries(self):
         output = ("Available devices:\n"

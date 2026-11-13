@@ -17,6 +17,7 @@ from scripts.verify_model import DEFAULT_MANIFEST, verify
 ROOT = DEFAULT_MANIFEST.parents[1]
 SOURCE = ROOT / "local/vendor/llama.cpp"
 BUILD = ROOT / "local/build/llama-cuda"
+RPC_BUILD = ROOT / "local/build/llama-cuda-rpc"
 RUNTIME = BUILD / "bin/llama-completion.exe"
 FLAGS = {
     "CMAKE_BUILD_TYPE": "Release",
@@ -49,7 +50,7 @@ def capture(argv, timeout=15, env=None, cwd=ROOT):
     )
 
 
-def build(revision):
+def build(revision, *, rpc=False):
     missing = [tool for tool in ("git", "cmake", "ninja", "cl", "nvcc") if not shutil.which(tool)]
     if missing:
         raise SmokeError("Missing from PATH: " + ", ".join(missing) + ". Use the x64 developer shell and see docs/windows-cuda.md.")
@@ -70,18 +71,22 @@ def build(revision):
     env = os.environ.copy()
     # CMake's CUDAHOSTCXX environment variable can override the compiler flag.
     env.pop("CUDAHOSTCXX", None)
+    build_dir = RPC_BUILD if rpc else BUILD
+    target = "ggml-rpc-server" if rpc else "llama-completion"
+    runtime = build_dir / "bin/ggml-rpc-server.exe" if rpc else RUNTIME
+    flags = {**FLAGS, "GGML_RPC": "ON", "GGML_RPC_RDMA": "OFF"} if rpc else FLAGS
     subprocess.run([
-        "cmake", "-S", str(SOURCE), "-B", str(BUILD), "-G", "Ninja",
+        "cmake", "-S", str(SOURCE), "-B", str(build_dir), "-G", "Ninja",
         "-DCUDAToolkit_ROOT:PATH=" + nvcc.parent.parent.as_posix(),
         "-DCMAKE_CUDA_COMPILER:FILEPATH=" + nvcc.as_posix(),
         "-DCMAKE_CUDA_HOST_COMPILER:FILEPATH=" + cl.as_posix(),
-        *(f"-D{key}={value}" for key, value in FLAGS.items()),
+        *(f"-D{key}={value}" for key, value in flags.items()),
     ], cwd=ROOT, env=env, check=True)
     subprocess.run([
-        "cmake", "--build", str(BUILD), "--target", "llama-completion", "--parallel", "4",
+        "cmake", "--build", str(build_dir), "--target", target, "--parallel", "4",
     ], cwd=ROOT, check=True)
-    if not RUNTIME.is_file():
-        raise SmokeError("The build did not produce llama-completion.exe.")
+    if not runtime.is_file():
+        raise SmokeError(f"The build did not produce {target}.exe.")
 
 
 def verified_cache():
@@ -193,6 +198,7 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     commands = parser.add_subparsers(dest="action", required=True)
     commands.add_parser("build", help="build the pinned source with Ninja and MSVC")
+    commands.add_parser("build-rpc", help="compile a separate NX-009 CUDA worker without starting it")
     runner = commands.add_parser("smoke", help="verify model and produce a sanitized JSON report")
     runner.add_argument("mode", choices=("cuda", "cpu"))
     runner.add_argument("--layers", type=int, choices=range(1, 65), metavar="1-64", default=32)
@@ -205,8 +211,8 @@ def main(argv=None):
         parser.error("--device must be a CUDA device ID, such as CUDA0")
     try:
         manifest = json.loads(DEFAULT_MANIFEST.read_text(encoding="utf-8"))
-        if args.action == "build":
-            build(manifest["runtime"]["candidate_revision"])
+        if args.action in ("build", "build-rpc"):
+            build(manifest["runtime"]["candidate_revision"], rpc=args.action == "build-rpc")
         else:
             model = (args.model or ROOT / "models" / manifest["artifact"]["filename"]).resolve()
             print(json.dumps(smoke(manifest, args.mode, args.layers, args.device, model), indent=2))
