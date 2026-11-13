@@ -76,6 +76,7 @@ Plattformantworten; das ersetzt keine Ausführung auf der Zielhardware.
   `python3 -m scripts.inventory_mac`
 - [Windows-Inventur auf dem Home-PC (NX-001)](docs/hardware.md#nx-001--windows-pc-erfassen):
   `py -3 -m scripts.inventory_windows`
+- [Nativer Windows-CUDA-Build und Smoke-Test (NX-006)](docs/windows-cuda.md)
 - [Festgelegtes Modellartefakt und lokale Hashprüfung](docs/model.md):
   `python3 -m scripts.verify_model /pfad/zur/Modelldatei.gguf`
 - [Mac-Solo-Baseline (NX-007)](docs/mac-baseline.md):
@@ -89,8 +90,8 @@ NX-002 (Inventur des bestätigten M5-Macs) und NX-004 (Modellmetadaten und
 Integritätsprüfung) sind umgesetzt. Das Q4_K_M-Testmodell wurde auf ausdrücklichen
 Nutzerauftrag lokal heruntergeladen und verifiziert; es ist nicht Teil von Git.
 
-1. NX-001: Den vorbereiteten Inventurbericht auf dem Windows-PC ausführen und
-   prüfen; anschließend NX-006 für den nativen CUDA-Build.
+1. NX-006: Den [nativen Windows-CUDA-Build](docs/windows-cuda.md) nach der
+   abgeschlossenen NX-001-Inventur auf dem Home-PC bauen und prüfen.
 2. NX-003: Tatsächliche LAN-Latenz und Bandbreite zwischen beiden Geräten messen.
 3. NX-008: Nach NX-006 die Windows-Solo-Baseline messen; danach NX-009 und
    NX-011/012 für den gemeinsamen Rechennachweis.
