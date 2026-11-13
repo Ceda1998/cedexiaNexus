@@ -6,13 +6,20 @@ from pathlib import Path
 import platform
 import sys
 
-from PySide6.QtCore import QObject, QProcess, QProcessEnvironment, QSettings, QTimer, Signal
+from PySide6.QtCore import QObject, QProcess, QProcessEnvironment, QSettings, QTimer, Qt, Signal
 from PySide6.QtGui import QTextCursor
-from PySide6.QtWidgets import QFileDialog, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QPlainTextEdit
+from PySide6.QtWidgets import QComboBox, QFileDialog, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QPlainTextEdit
 
 
 ROOT = Path(__file__).resolve().parents[1]
 VERIFY_FLAG = "--verify-local-model"
+GGUF_ERRORS = {
+    "not_gguf": "Die Datei ist kein GGUF-Modell.",
+    "truncated": "Die GGUF-Datei ist unvollständig.",
+    "unsupported_version": "Diese GGUF-Version wird von der Runtime nicht unterstützt.",
+    "no_tensors": "Diese GGUF-Datei enthält keine Modellgewichte.",
+    "missing_or_unreadable": "Die GGUF-Datei fehlt oder ist nicht lesbar.",
+}
 
 
 def windows_prompt(prompt):
@@ -32,18 +39,22 @@ class LocalRunner(QObject):
         self.root = Path(root)
         self.windows = platform.system() == "Windows"
         self.frozen = getattr(sys, "frozen", False)
-        self.settings = QSettings("Cedexia", "Nexus") if self.windows else None
+        self.settings = QSettings("Cedexia", "Nexus")
         if self.windows:
             runtime_dir = self.root / "runtime" if self.frozen else self.root / "local/build/llama-cuda/bin"
             self.runtime = runtime_dir / "llama-completion.exe"
             model_dir = Path(sys.executable).parent if self.frozen else self.root
-            saved_model = self.settings.value("local_model_path", "", type=str)
         else:
             self.runtime = self.root / "local/build/llama-metal/bin/llama-completion"
             model_dir = self.root
-            saved_model = ""
-        self.model = Path(saved_model) if saved_model else model_dir / "models/Qwen3.8-27B-Q4_K_M.gguf"
-        self.manifest = self.root / "config/model-manifest.json"
+        self.models = list(dict.fromkeys(self.settings.value("local_model_paths", [], type=list)))
+        saved_model = self.settings.value("local_model_path", "", type=str)
+        if saved_model and saved_model not in self.models:
+            self.models.append(saved_model)
+        default_model = model_dir / "models/Qwen3.8-27B-Q4_K_M.gguf"
+        if not self.settings.contains("local_model_paths") and not self.models and default_model.is_file():
+            self.models.append(str(default_model))
+        self.model = Path(saved_model or self.models[0]) if self.models else None
         self.busy = False
         self.process = None
         self.phase = ""
@@ -51,6 +62,7 @@ class LocalRunner(QObject):
         self.prompt = ""
         self.received = 0
         self.proof = bytearray()
+        self.diagnostics = bytearray()
         self.decoder = codecs.getincrementaldecoder("utf-8")("replace")
         self.timer = QTimer(self)
         self.timer.setSingleShot(True)
@@ -67,23 +79,25 @@ class LocalRunner(QObject):
             if self.windows:
                 return "CUDA-Runtime fehlt. Entpacke das vollständige Windows-Paket."
             return "Lokale Runtime fehlt. Zuerst den Metal-Build aus NX-005 einrichten."
-        try:
-            manifest = json.loads(self.manifest.read_text(encoding="utf-8"))
-            expected = manifest["artifact"]["size_bytes"]
-            if self.model.stat().st_size != expected:
-                return "Die Modelldatei ist unvollständig oder hat die falsche Größe."
-        except FileNotFoundError:
-            if self.windows:
-                return "Wähle deine lokale Qwen3.8-27B-Q4_K_M.gguf-Datei aus."
-            return "Modelldatei oder Modellmanifest fehlt."
-        except (OSError, ValueError, KeyError, TypeError):
-            return "Modelldatei oder Modellmanifest fehlt bzw. ist nicht lesbar."
+        if self.model is None:
+            return "Füge eine lokale GGUF-Datei hinzu."
+        if not self.model.is_file():
+            return "Diese Modelldatei fehlt. Wähle eine vorhandene GGUF-Datei aus."
         return ""
 
     def select_model(self, path):
-        if not self.busy and self.settings is not None:
-            self.model = Path(path).resolve()
-            self.settings.setValue("local_model_path", str(self.model))
+        if not self.busy:
+            path = str(Path(path).absolute()) if path else ""
+            if path and path not in self.models:
+                self.models.append(path)
+            self.model = Path(path) if path else None
+            self.settings.setValue("local_model_paths", self.models)
+            self.settings.setValue("local_model_path", path)
+
+    def remove_model(self):
+        if not self.busy and self.model is not None:
+            self.models.remove(str(self.model))
+            self.select_model(self.models[0] if self.models else "")
 
     def start(self, prompt):
         if self.busy:
@@ -97,14 +111,13 @@ class LocalRunner(QObject):
         self.prompt = prompt
         self.received = 0
         self.proof.clear()
+        self.diagnostics.clear()
         self.decoder.reset()
         self.busy_changed.emit(True)
         self.status.emit("Modelldatei wird geprüft … Die Oberfläche bleibt bedienbar.")
         self.timer.start()
         verifier = [VERIFY_FLAG] if self.frozen else ["-m", "scripts.verify_model"]
-        self._spawn("verify", sys.executable, [
-            *verifier, str(self.model), "--manifest", str(self.manifest),
-        ])
+        self._spawn("verify", sys.executable, [*verifier, str(self.model), "--gguf"])
         return True
 
     def _runtime_command(self):
@@ -135,8 +148,7 @@ class LocalRunner(QObject):
         proc.setProgram(program)
         proc.setArguments(arguments)
         proc.readyReadStandardOutput.connect(lambda: self._read_output(proc))
-        # Drain logs, but never display or retain raw runtime paths or prompts.
-        proc.readyReadStandardError.connect(lambda: proc.readAllStandardError())
+        proc.readyReadStandardError.connect(lambda: self._read_diagnostics(proc))
         proc.started.connect(lambda: self._started(proc))
         proc.errorOccurred.connect(lambda error: self._error(proc, error))
         proc.finished.connect(lambda code, status: self._exited(proc, code, status))
@@ -177,6 +189,21 @@ class LocalRunner(QObject):
             self._dispose(proc)
             self._finish(self.stop_reason or "Lokaler Prozess konnte nicht starten. Build und Zugriffsrechte prüfen.")
 
+    def _read_diagnostics(self, proc):
+        data = bytes(proc.readAllStandardError())
+        if proc is self.process and self.phase == "generate":
+            self.diagnostics[:] = (self.diagnostics + data)[-8192:]
+
+    def _load_error(self):
+        log = self.diagnostics.lower()
+        if b"unknown model architecture" in log:
+            return "Die Architektur dieses GGUF-Modells wird von der gebündelten Runtime nicht unterstützt."
+        if b"out of memory" in log or b"failed to allocate" in log:
+            return "Für dieses Modell ist nicht genug freier Speicher verfügbar. Versuche eine kleinere Quantisierung."
+        if b"invalid device" in log or b"failed to initialize cuda" in log:
+            return "Die Runtime findet das CUDA-Gerät nicht. Prüfe den NVIDIA-Treiber."
+        return "Modelllauf fehlgeschlagen. Prüfe GGUF-Kompatibilität, freien Speicher und bei geteilten Modellen alle Dateiteile."
+
     def _dispose(self, proc):
         self.process = None
         proc.deleteLater()
@@ -185,24 +212,25 @@ class LocalRunner(QObject):
         if proc is not self.process:
             return
         self._read_output(proc)
-        proc.readAllStandardError()
+        self._read_diagnostics(proc)
         self._dispose(proc)
         if self.stop_reason:
             self._finish(self.stop_reason)
         elif self.phase == "verify":
             try:
-                valid = code == 0 and json.loads(self.proof).get("verified") is True
-            except (ValueError, AttributeError):
-                valid = False
+                proof = json.loads(self.proof)
+                valid = code == 0 and proof.get("header_ok") is True
+                error = GGUF_ERRORS.get(proof.get("error"))
+            except (ValueError, AttributeError, TypeError):
+                valid, error = False, None
             self.proof.clear()
             if not valid:
-                self._finish("Modellprüfung fehlgeschlagen. Datei und SHA-256 prüfen; es wurde keine Inferenz gestartet.")
+                self._finish(error or "Modellprüfung fehlgeschlagen. Prüfe die lokale GGUF-Datei.")
             else:
                 self.status.emit("Lokales Modell wird geladen …")
                 self._spawn("generate", *self._runtime_command())
         elif code != 0 or status != QProcess.ExitStatus.NormalExit:
-            backend = "NVIDIA-Treiber" if self.windows else "Metal-Build"
-            self._finish(f"Lokaler Modelllauf fehlgeschlagen. Freien Speicher, Eingabelänge und {backend} prüfen.")
+            self._finish(self._load_error())
         else:
             self.output.emit(self.decoder.decode(b"", final=True))
             self._finish("Lokaler Lauf beendet." if self.received else
@@ -224,6 +252,7 @@ class LocalRunner(QObject):
         self.timer.stop()
         self.prompt = ""
         self.proof.clear()
+        self.diagnostics.clear()
         self.busy = False
         self.busy_changed.emit(False)
         self.status.emit(message)
@@ -238,17 +267,29 @@ class LocalModelPage(QWidget):
         heading = QLabel("Dein Modell. Auf diesem PC." if self.runner.windows else "Dein Modell. Auf diesem Mac.")
         heading.setObjectName("title")
         layout.addWidget(heading)
-        description = QLabel("Qwen3.8-27B · Echte lokale Textgenerierung · Keine Verbindung zu anderen Geräten")
+        description = QLabel("Textgenerierung mit lokalen GGUF-Modellen")
         description.setWordWrap(True)
         layout.addWidget(description)
         self.status = QLabel(self.runner.unavailable_reason() or "Bereit. Die Modelldatei wird vor jedem Start geprüft.")
         self.status.setObjectName("banner")
         self.status.setWordWrap(True)
         layout.addWidget(self.status)
-        if self.runner.windows:
-            self.choose_model = QPushButton("GGUF-Datei auswählen …")
-            self.choose_model.clicked.connect(self.pick_model)
-            layout.addWidget(self.choose_model)
+        models = QHBoxLayout()
+        self.model_list = QComboBox()
+        self.model_list.setAccessibleName("Lokales GGUF-Modell")
+        self.model_list.setPlaceholderText("Kein GGUF-Modell ausgewählt")
+        models.addWidget(self.model_list, 1)
+        self.choose_model = QPushButton("GGUF hinzufügen …")
+        self.choose_model.clicked.connect(self.pick_model)
+        models.addWidget(self.choose_model)
+        self.remove_model = QPushButton("Eintrag entfernen")
+        self.remove_model.clicked.connect(self.forget_model)
+        models.addWidget(self.remove_model)
+        layout.addLayout(models)
+        self.model_info = QLabel()
+        self.model_info.setTextFormat(Qt.TextFormat.PlainText)
+        self.model_info.setWordWrap(True)
+        layout.addWidget(self.model_info)
         self.prompt = QPlainTextEdit()
         self.prompt.setPlaceholderText("Zum Beispiel: Baue mir eine kleine HTML-Website für ein Restaurant …")
         self.prompt.setAccessibleName("Frage an das lokale Modell")
@@ -279,22 +320,62 @@ class LocalModelPage(QWidget):
         self.runner.busy_changed.connect(self.refresh)
         self.runner.status.connect(self.status.setText)
         self.runner.output.connect(self.append_output)
-        self.refresh()
+        self.update_model_list()
+        self.model_list.currentIndexChanged.connect(self.change_model)
+        self.update_selection()
 
     def refresh(self, *_):
         self.start.setEnabled(not self.runner.busy and bool(self.prompt.toPlainText().strip())
                               and not self.runner.unavailable_reason())
         self.stop.setEnabled(self.runner.busy)
         self.prompt.setReadOnly(self.runner.busy)
-        if self.runner.windows:
-            self.choose_model.setEnabled(not self.runner.busy)
+        self.model_list.setEnabled(not self.runner.busy)
+        self.choose_model.setEnabled(not self.runner.busy)
+        self.remove_model.setEnabled(not self.runner.busy and self.runner.model is not None)
+
+    def update_model_list(self):
+        self.model_list.blockSignals(True)
+        self.model_list.clear()
+        for path in self.runner.models:
+            self.model_list.addItem(Path(path).name, path)
+        self.model_list.setCurrentIndex(self.model_list.findData(str(self.runner.model)))
+        self.model_list.blockSignals(False)
+
+    def update_model_info(self):
+        model = self.runner.model
+        if model is None:
+            self.model_info.clear()
+            return
+        try:
+            size = model.stat().st_size
+        except OSError:
+            self.model_info.setText(f"{model.name} · Datei nicht gefunden")
+        else:
+            self.model_info.setText(f"{model.name} · {size / 1024**3:.2f} GiB")
+
+    def change_model(self, index):
+        if index >= 0:
+            self.runner.select_model(self.model_list.itemData(index))
+            self.update_selection()
+
+    def update_selection(self):
+        self.output.clear()
+        self.update_model_info()
+        self.status.setText(self.runner.unavailable_reason() or "Bereit. Die GGUF-Datei wird beim Start geprüft.")
+        self.refresh()
+
+    def forget_model(self):
+        self.runner.remove_model()
+        self.update_model_list()
+        self.update_selection()
 
     def pick_model(self):
-        path, _ = QFileDialog.getOpenFileName(self, "Lokales Qwen-Modell auswählen", "", "GGUF (*.gguf)")
-        if path:
-            self.runner.select_model(path)
-            self.status.setText(self.runner.unavailable_reason() or "Bereit. Die Modelldatei wird vor jedem Start geprüft.")
-            self.refresh()
+        paths, _ = QFileDialog.getOpenFileNames(self, "Lokale GGUF-Modelle hinzufügen", "", "GGUF (*.gguf)")
+        if paths:
+            for path in paths:
+                self.runner.select_model(path)
+            self.update_model_list()
+            self.update_selection()
 
     def start_run(self):
         if self.runner.busy:

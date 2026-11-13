@@ -17,7 +17,8 @@ NX-042 ergänzt **„Lokales Modell“**: echte Mac-Inferenz mit Eingabe, laufen
 Ausgabe und Stopp. Start: `.venv/bin/python -m nexus_ui`. Die Ansicht öffnet sich
 direkt; Voraussetzungen und Grenzen stehen in [docs/desktop.md](docs/desktop.md).
 NX-052 liefert ein [startbares Windows-Paket](docs/windows-app.md) mit CUDA
-und Auswahl der lokalen GGUF-Datei. Der Paketstart ist unter Windows geprüft.
+und Auswahl lokaler GGUF-Textmodelle. NX-046 ergänzt auf Mac und Windows eine
+gespeicherte Liste für eigene GGUF-Dateien. Der Paketstart ist unter Windows geprüft.
 Die CUDA-Inferenz auf dem physischen Zielgerät steht zur Abnahme aus.
 
 NX-005: Qwen3.8-27B Q4_K_M generiert lokal auf dem bestätigten M5-Mac Text mit

@@ -4,7 +4,8 @@ Die UI verwendet Python/PySide6 und läuft ohne Netzwerkverbindung. Übersicht,
 Einrichtung, Geräte und Demo-Sitzung sind ausdrücklich simuliert. Die getrennte
 Ansicht **Lokales Modell** führt auf dem Mac Textinferenz aus. Für Windows
 liefert NX-052 ein Paket mit derselben Ansicht und CUDA als Backend.
-Windows merkt sich den Modellpfad. Prompts und Antworten bleiben im Speicher.
+Beide Apps merken sich die hinzugefügten Modellpfade und die letzte Auswahl.
+Prompts und Antworten bleiben im Speicher.
 
 ## Lokales Modell in der UI testen
 
@@ -13,16 +14,19 @@ Dateiauswahl zur Abnahme auf dem Ziel-PC bereit. Die folgende Anleitung
 beschreibt den bereits geprüften Mac-Pfad.
 
 Auf dem in NX-005 eingerichteten Mac `.venv/bin/python -m nexus_ui` starten.
-Die App öffnet „Lokales Modell“. Eine Aufgabe eingeben und **Lokal starten**
-wählen. Die Datei wird vor jedem Lauf vollständig gegen Größe/SHA-256 geprüft,
-danach geladen; die Antwort erscheint schrittweise. **Stoppen** funktioniert
+Die App öffnet „Lokales Modell“. Über **GGUF hinzufügen …** vorhandene Dateien
+in die Liste aufnehmen und das gewünschte Modell wählen. Eine Aufgabe eingeben
+und **Lokal starten** wählen. Die App prüft den GGUF-Dateikopf und übergibt die
+Datei an llama.cpp. Die Antwort erscheint schrittweise. **Stoppen** funktioniert
 auch während der Prüfung und beim Laden. Schließen des Fensters beendet den
 lokalen Prozess. Nach Abschluss oder Fehler ist ein manueller Neustart möglich.
 
 Voraussetzungen: nativer Apple-Silicon-Mac, der [NX-005-Build](mac-metal.md) unter
-`local/build/llama-metal/bin/llama-completion`, das gepinnte Modell unter `models/`
-und `config/model-manifest.json`. Fehlende Voraussetzungen werden angezeigt;
-es erfolgt weder Installation noch Download. Windows zeigt die Einschränkung.
+`local/build/llama-metal/bin/llama-completion` und ein kompatibles GGUF-Textmodell,
+das in den verfügbaren Speicher passt. Bei einem geteilten GGUF den ersten Teil
+auswählen und alle Teile im selben Ordner belassen. **Eintrag entfernen** entfernt
+nur den Pfad. Eine vorhandene Datei `models/Qwen3.8-27B-Q4_K_M.gguf` wird beim
+ersten Start vorausgewählt. Installation und Download erfolgen manuell.
 
 Grenzen seit NX-043: einzelne Aufgaben ohne Gesprächshistorie, 16384 Kontexttokens,
 höchstens 12000 Eingabezeichen und 8192 Ausgabetokens. Zeichen sind keine Tokens:
@@ -39,9 +43,9 @@ Die Ausgabe ist weiterhin Klartext zum Kopieren; generierter Code wird nicht
 ausgeführt. Nach einem Update die App neu starten, damit die neuen Grenzen gelten.
 
 Technik: `nexus_ui/local_model.py` verwaltet jeweils einen asynchronen QProcess.
-Erst Hashprüfung, dann direkte Runtime-Ausführung ohne Shell. Der Prompt wird
+Erst GGUF-Kopfprüfung, dann direkte Runtime-Ausführung ohne Shell. Der Prompt wird
 über stdin übergeben, nicht als Prozessargument oder temporäre Datei. Runtime-
-Logs werden verworfen, Fehler als allgemeine verständliche Meldungen angezeigt.
+Fehler werden in verständliche Meldungen übersetzt. Die App speichert keine Rohlogs.
 Keine Prompt-/Antwortpersistenz, kein HTTP-/RPC-Server. Demo-Aktionen verändern
 den lokalen Modellprozess nicht.
 
