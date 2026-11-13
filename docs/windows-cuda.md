@@ -1,5 +1,9 @@
 # NX-006 · Windows-Build mit CUDA und CPU-Test
 
+Für den Start der Desktop-App steht das [Windows-EXE-Paket](windows-app.md)
+bereit, sobald sein GitHub-Workflow erfolgreich abgeschlossen ist. Diese
+Anleitung dient der getrennten Abnahme des nativen Entwickler-Builds.
+
 Der Home-PC aus [NX-001](hardware.md) hat eine RTX 5070 Ti mit 16.303 MiB
 VRAM und meldete NVIDIA-Treiber 621.01. Der erste Pfad ist natives
 Windows x64 mit CUDA. Die RTX 5070 Ti hat Compute Capability 12.0. Der

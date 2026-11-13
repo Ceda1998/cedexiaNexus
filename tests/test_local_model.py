@@ -9,7 +9,7 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 try:
     from PySide6.QtTest import QTest
     from nexus_ui.app import NexusWindow, make_application
-    from nexus_ui.local_model import LocalRunner, LocalModelPage
+    from nexus_ui.local_model import LocalRunner, LocalModelPage, windows_prompt
 except ModuleNotFoundError as exc:
     if exc.name != "PySide6":
         raise
@@ -20,6 +20,8 @@ if LocalRunner is not None:
     class FixtureRunner(LocalRunner):
         def __init__(self, **kwargs):
             super().__init__(**kwargs)
+            # The test child reads raw stdin rather than llama.cpp's Windows console protocol.
+            self.windows = False
             self.verify_code = 'print(\'{"verified": true}\')'
             self.generate_code = (
                 'import sys,time; p=sys.stdin.read(); '
@@ -151,7 +153,8 @@ class LocalModelTests(unittest.TestCase):
 
     def test_platform_guard_and_missing_runtime(self):
         real = LocalRunner()
-        with patch("nexus_ui.local_model.platform.system", return_value="Windows"):
+        with patch("nexus_ui.local_model.platform.system", return_value="Linux"):
+            real.windows = False
             self.assertIn("macOS", real.unavailable_reason())
             self.assertFalse(real.start("test"))
             self.assertIsNone(real.process)
@@ -159,3 +162,16 @@ class LocalModelTests(unittest.TestCase):
             real.runtime = real.root / "missing-test-runtime"
             self.assertIn("Runtime fehlt", real.unavailable_reason())
         real.deleteLater()
+
+    def test_windows_prompt_stays_on_one_line_and_preserves_escapes(self):
+        import re
+
+        prompt = 'Grüße\r\nC:\\new\\test\nLiterales \\x2f und URL https://example.test/'
+        wire = windows_prompt(prompt).decode("utf-8")
+        self.assertEqual(wire.count("\n"), 1)
+        self.assertNotIn("/", wire)
+        # Decode with the escape sequences supported by the pinned completion binary.
+        decoded = re.sub(r"\\(?:x([0-9a-f]{2})|([rn]))",
+                         lambda m: chr(int(m[1], 16)) if m[1] else {"r": "\r", "n": "\n"}[m[2]],
+                         wire[:-1])
+        self.assertEqual(decoded, prompt)

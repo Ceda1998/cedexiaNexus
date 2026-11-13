@@ -8,6 +8,10 @@ Windows-Inferenz oder Dual-Host-Anbindung.
 
 ## Lokales Modell in der UI testen
 
+Unter Windows x64 steht der [EXE-Paketpfad](windows-app.md) mit CUDA und
+Dateiauswahl zur Abnahme auf dem Ziel-PC bereit. Die folgende Anleitung
+beschreibt den bereits geprüften Mac-Pfad.
+
 Auf dem in NX-005 eingerichteten Mac `.venv/bin/python -m nexus_ui` starten.
 Die App öffnet „Lokales Modell“. Eine Aufgabe eingeben und **Lokal starten**
 wählen. Die Datei wird vor jedem Lauf vollständig gegen Größe/SHA-256 geprüft,

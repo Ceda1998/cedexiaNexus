@@ -153,7 +153,7 @@ class NexusWindow(QMainWindow):
     def overview(self):
         layout = self.page("Rechenleistung verbinden.", "Zwei Geräte. Eine lokale KI-Sitzung — als Ablaufvorschau.")
         self.summary = self.panel(layout, "Dein Arbeitsbereich", "")
-        self.panel(layout, "Gemeinsame Berechnung", "Nicht belegt. Diese Vorschau ist simuliert. Echte Mac-Inferenz findest du unter ‚Lokales Modell‘.")
+        self.panel(layout, "Gemeinsame Berechnung", "Diese Vorschau ist simuliert. Die Einzelgeräte-Ansicht findest du unter ‚Lokales Modell‘.")
         layout.addWidget(button("Lokales Modell öffnen", lambda: self.navigate(4), "player-play", True))
         layout.addWidget(button("Einrichtung öffnen", lambda: self.navigate(1), "checklist", True))
         layout.addStretch()
@@ -220,7 +220,7 @@ class NexusWindow(QMainWindow):
         layout.addWidget(label("TTFT: Nicht gemessen · Tokens/s: Nicht gemessen · Beteiligung beider Geräte: Nicht nachgewiesen", "subtitle"))
 
     def about(self):
-        layout = self.page("Über Nexus.", "NX-037 · Demo / NX-042 · Lokaler Mac-Modelltest")
+        layout = self.page("Über Nexus.", "Desktop-Demo und lokaler Modelltest")
         self.panel(layout, "Darstellung", "Dunkelblau #173B70 · Eckige Komponenten · Satoshi lokal\nTabler Icons Outline v3.35.0 · MIT")
         layout.addWidget(button("Tabler-Lizenz anzeigen", self.show_license, "settings"))
         self.panel(layout, "Daten", "Demo-Seiten sind simuliert. ‚Lokales Modell‘ verarbeitet deine Frage mit den vorhandenen lokalen Gewichten. Kein Netzwerk und kein Speichern von Eingaben oder Antworten.")
@@ -235,7 +235,7 @@ class NexusWindow(QMainWindow):
 
     def navigate(self, index):
         self.stack.setCurrentIndex(index)
-        self.banner.setText("LOKAL · Echte Modellantwort auf diesem Mac · Kein Dual-Host-Betrieb" if index == 4 else
+        self.banner.setText("LOKAL · Modelltest auf diesem Gerät" if index == 4 else
                             "DEMO · Diese Ablaufseiten sind simuliert; echte Inferenz unter ‚Lokales Modell‘")
         for i, nav in enumerate(self.nav):
             nav.setChecked(index == i)
@@ -350,11 +350,13 @@ def make_application():
     return app, bool(loaded)
 
 
-def main():
+def main(smoke=False):
     app, font_loaded = make_application()
     window = NexusWindow()
     window.navigate(4)
     if not font_loaded:
         window.font_notice.setText("Satoshi fehlt · Systemschrift aktiv. Einrichtung siehe docs/desktop.md.")
     window.show()
+    if smoke:
+        QTimer.singleShot(100, app.quit)
     sys.exit(app.exec())

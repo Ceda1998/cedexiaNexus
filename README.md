@@ -77,6 +77,7 @@ Plattformantworten; das ersetzt keine Ausführung auf der Zielhardware.
 - [Windows-Inventur auf dem Home-PC (NX-001)](docs/hardware.md#nx-001--windows-pc-erfassen):
   `py -3 -m scripts.inventory_windows`
 - [Nativer Windows-CUDA-Build und Smoke-Test (NX-006)](docs/windows-cuda.md)
+- [Startbares Windows-Paket mit CedexiaNexus.exe (NX-052)](docs/windows-app.md)
 - [Festgelegtes Modellartefakt und lokale Hashprüfung](docs/model.md):
   `python3 -m scripts.verify_model /pfad/zur/Modelldatei.gguf`
 - [Mac-Solo-Baseline (NX-007)](docs/mac-baseline.md):
