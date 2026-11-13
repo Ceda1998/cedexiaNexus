@@ -7,6 +7,10 @@ Beide Hosts müssen an derselben Modellberechnung beteiligt sein.
 
 ## Status
 
+Die Desktop-App startet mit Projekten und Chats, einklappbarer Sidebar,
+Moduswahl und separaten Einstellungen. Der lokale Composer verwendet die
+vorhandene Runtime. [Bedienung und Funktionsstand](docs/desktop.md#projekt--und-chatoberfläche).
+
 NX-037 ergänzt eine **Offline-Desktop-Demo** mit PySide6: Übersicht, Einrichtung,
 Geräte, Ressourcenentwurf und simulierter Sitzungsablauf. Dunkelblau, eckige
 Komponenten, lokal installierte Satoshi und Tabler-Outline-SVGs.
