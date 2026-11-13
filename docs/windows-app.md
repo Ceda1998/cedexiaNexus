@@ -16,6 +16,11 @@ sind das erste Ziel. Der CUDA-Testpfad nutzt zunächst 32 GPU-Layer und
 4096 Kontexttokens. Windows-CUDA-Inferenz muss auf dem Ziel-PC abgenommen werden.
 Das Paket ist ein unsignierter Testbuild.
 
+Erster geprüfter Paketlauf für Commit `a6ccd6f`.
+[GitHub Actions 43439544349](https://github.com/Ceda1998/cedexiaNexus/actions/runs/43439544349)
+bestätigt den Start des Fensters, die geladene llama.cpp-Revision und die
+gebündelte SHA-256-Prüfung. GitHub hält die ZIP-Datei 14 Tage vor.
+
 ## Paket bauen
 
 Der Windows-Workflow baut das Paket mit PyInstaller 6.22.3 und PySide6 6.8.3.

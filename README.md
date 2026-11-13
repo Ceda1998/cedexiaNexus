@@ -16,18 +16,18 @@ Vollständige Windows-/Mac-Abnahme (u. a. High-DPI) bleibt offen.
 NX-042 ergänzt **„Lokales Modell“**: echte Mac-Inferenz mit Eingabe, laufender
 Ausgabe und Stopp. Start: `.venv/bin/python -m nexus_ui`. Die Ansicht öffnet sich
 direkt; Voraussetzungen und Grenzen stehen in [docs/desktop.md](docs/desktop.md).
-Hardwarediagnose, Windows-Inferenz und Dual-Host sind noch nicht angebunden.
+NX-052 liefert ein [startbares Windows-Paket](docs/windows-app.md) mit CUDA
+und Auswahl der lokalen GGUF-Datei. Der Paketstart ist unter Windows geprüft.
+Die CUDA-Inferenz auf dem physischen Zielgerät steht zur Abnahme aus.
 
 NX-005: Qwen3.8-27B Q4_K_M generiert lokal auf dem bestätigten M5-Mac Text mit
 Metal (65/65 Layer auf GPU). [Start und Nachweis](docs/mac-metal.md):
 `sh scripts/run_mac_model.sh "Deine kurze Frage"`. Dies ist ein begrenzter
 Terminal-Test; CUDA und gemeinsame Inferenz bleiben ungeprüft.
 
-NX-040 stellt die Repository-Grundlage bereit: Dokumentation, lokale Diagnose,
-Unit-Tests und GPU-unabhängige CI. Der lokale llama.cpp-Test ist noch nicht in
-Nexus integriert; es gibt keinen Server und keinen nachgewiesenen
-CUDA-/Metal-Verbund. Ein erfolgreicher
-Hardwarecheck bestätigt keine Backend- oder Modellkompatibilität.
+NX-040 stellt die Repository-Grundlage mit Dokumentation, lokaler Diagnose,
+Unit-Tests und GPU-unabhängiger CI bereit. Der gemeinsame CUDA-/Metal-Lauf
+bleibt ein separates Prototypziel.
 
 ## Installation und lokale Prüfung
 

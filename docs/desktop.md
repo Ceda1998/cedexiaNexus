@@ -1,10 +1,10 @@
-# Desktop-Prototyp · NX-037 Demo / NX-042 lokales Modell
+# Desktop-Prototyp · Demo und lokales Modell
 
 Die UI verwendet Python/PySide6 und läuft ohne Netzwerkverbindung. Übersicht,
 Einrichtung, Geräte und Demo-Sitzung sind ausdrücklich simuliert. Die getrennte
-Ansicht **Lokales Modell** aus NX-042 führt echte Textinferenz auf dem Mac aus.
-Es gibt keine persistierten Nutzereingaben und keine Hardwarediagnose,
-Windows-Inferenz oder Dual-Host-Anbindung.
+Ansicht **Lokales Modell** führt auf dem Mac Textinferenz aus. Für Windows
+liefert NX-052 ein Paket mit derselben Ansicht und CUDA als Backend.
+Windows merkt sich den Modellpfad. Prompts und Antworten bleiben im Speicher.
 
 ## Lokales Modell in der UI testen
 
