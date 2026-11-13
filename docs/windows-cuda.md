@@ -25,8 +25,12 @@ enthält die jeweils unterstützten MSVC-Versionen. NX-001 fand `cl`,
 Get-Command git, cmake, ninja, cl, nvcc, nvidia-smi
 cmake --version
 nvcc --version
-nvcc --list-gpu-code | Select-String 'sm_120a'
 ```
+
+`nvcc --list-gpu-code` zeigt nur Ziele ohne architekturspezifischen Zusatz.
+Wenn dort `sm_120` steht, prüft der anschließende Build, ob der Compiler
+auch das von llama.cpp verwendete `sm_120a` erzeugen kann.
+[NVIDIA-Dokumentation zu nvcc](https://docs.nvidia.com/cuda/cuda-compiler-driver-nvcc/index.html#list-gpu-code-list-gpu-code).
 
 Falls die Werkzeuge fehlen, die C++-Desktopentwicklung mit Windows SDK
 über [Visual Studio Build Tools](https://visualstudio.microsoft.com/downloads/#build-tools-for-visual-studio)

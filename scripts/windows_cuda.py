@@ -65,9 +65,8 @@ def build(revision):
         raise SmokeError("Use a clean llama.cpp checkout at the manifest revision.")
     nvcc = Path(shutil.which("nvcc")).resolve()
     cl = Path(shutil.which("cl")).resolve()
-    codes = capture([str(nvcc), "--list-gpu-code"]).stdout
-    if "sm_120a" not in codes.split():
-        raise SmokeError("This nvcc cannot target sm_120a. See docs/windows-cuda.md.")
+    # nvcc --list-gpu-code omits architecture-specific targets such as sm_120a.
+    # Let CMake's CUDA compiler check and the build validate the actual target.
     env = os.environ.copy()
     # CMake's CUDAHOSTCXX environment variable can override the compiler flag.
     env.pop("CUDAHOSTCXX", None)

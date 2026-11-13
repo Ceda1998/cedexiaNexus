@@ -1,5 +1,10 @@
 import unittest
+from pathlib import Path
+from subprocess import CompletedProcess
+from tempfile import TemporaryDirectory
+from unittest.mock import patch
 
+from scripts import windows_cuda
 from scripts.windows_cuda import SmokeError, cuda_devices, smoke_evidence
 
 
@@ -14,6 +19,38 @@ load_tensors: offloaded 32/65 layers to GPU
 
 
 class WindowsCudaTests(unittest.TestCase):
+    def test_build_does_not_require_sm_120a_in_nvcc_listing(self):
+        revision = "a" * 40
+
+        def capture(argv, **kwargs):
+            if argv[-1] == "--version":
+                output = "cmake version 4.2.0\n"
+            elif argv[-1] == "HEAD":
+                output = revision
+            elif argv[-1] == "--porcelain":
+                output = ""
+            elif argv[-1] == "--list-gpu-code":
+                output = "sm_120\n"
+            else:
+                self.fail(f"Unexpected command: {argv}")
+            return CompletedProcess(argv, 0, output)
+
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / ".git").mkdir()
+            runtime = root / "llama-completion.exe"
+            runtime.touch()
+            with (
+                patch.object(windows_cuda, "SOURCE", root),
+                patch.object(windows_cuda, "RUNTIME", runtime),
+                patch.object(windows_cuda.shutil, "which", side_effect=lambda tool: str(root / tool)),
+                patch.object(windows_cuda, "capture", side_effect=capture),
+                patch.object(windows_cuda.subprocess, "run") as run,
+            ):
+                windows_cuda.build(revision)
+        self.assertIn("-DCMAKE_CUDA_ARCHITECTURES=120a-real", run.call_args_list[0].args[0])
+        self.assertIn("--build", run.call_args_list[1].args[0])
+
     def test_device_list_keeps_only_cuda_entries(self):
         output = ("Available devices:\n"
                   "  CUDA0: NVIDIA GeForce RTX 5070 Ti (16303 MiB, 14712 MiB free)\n"
