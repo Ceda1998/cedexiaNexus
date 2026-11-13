@@ -132,12 +132,15 @@ class LocalRunner(QObject):
             ("CUDA0", "32", "4096", "-2") if self.windows else ("MTL0", "all", "16384", "8192")
         )
         input_args = ["--simple-io", "--escape", "--no-context-shift"] if self.windows else ["--file", "/dev/stdin"]
+        context = str(self.settings.value("context", int(context), type=int))
+        predict = str(self.settings.value("predict", int(predict), type=int))
+        reasoning = "on" if self.settings.value("reasoning", False, type=bool) else "off"
         return str(self.runtime), [
             "--model", str(self.model), "--offline", "--device", device,
             "--n-gpu-layers", layers, "--fit", "off", "--ctx-size", context,
             "--batch-size", "128", "--ubatch-size", "128", "--threads", "4",
             "--predict", predict, "--seed", "42", "--temp", "0", "--jinja",
-            "--conversation", "--single-turn", "--reasoning", "off",
+            "--conversation", "--single-turn", "--reasoning", reasoning,
             "--no-display-prompt", "--color", "off", *input_args,
         ]
 

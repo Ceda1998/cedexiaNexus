@@ -361,10 +361,8 @@ def main(smoke=False):
     app, font_loaded = make_application()
     if smoke:
         host_context()
-    window = NexusWindow()
-    window.navigate(2 if smoke else 4)
-    if not font_loaded:
-        window.font_notice.setText("Satoshi fehlt · Systemschrift aktiv. Einrichtung siehe docs/desktop.md.")
+    from .workspace import Workspace
+    window = Workspace()
     window.show()
     if smoke:
         QTimer.singleShot(100, app.quit)

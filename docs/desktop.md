@@ -1,5 +1,33 @@
 # Desktop-App · Lokale Modelle und LAN-Verbindung
 
+## Projekt- und Chatoberfläche
+
+NX-054 und NX-055 öffnen die App mit einer einklappbaren Sidebar, Projekten und
+Chats. Der Composer unten enthält die GGUF-Auswahl, Diktateinstieg, Senden und
+Stoppen. Nachrichten werden pro Chat in einer SQLite-Datenbank im lokalen
+App-Datenverzeichnis gespeichert. Beim Neustart öffnet sich der zuletzt
+angelegte Chat. Chats lassen sich nach Bestätigung löschen. Die Datenbank ist
+unverschlüsselt und unterliegt dem Zugriffsschutz des Benutzerkontos.
+
+Der lokale Chat übergibt den bisherigen Verlauf als Text an die bestehende
+Runtime. Das Gesamtlimit von 12000 Zeichen gilt einschließlich Verlauf und
+Skills. Bei Überschreitung ist ein neuer Chat erforderlich. Antworten werden
+als Markdown dargestellt. Externe Links öffnen nach Bestätigung, eingebettete
+Bilder werden nicht geladen. Der Kopierbutton kopiert die letzte Antwort.
+
+**Einstellungen** öffnet ein separates Fenster mit Schriftgröße, hellem/dunklem
+Erscheinungsbild, Kontext- und Ausgabetokens, Reasoning-Anforderung, lokalen
+Prompt-Anweisungen und Geräteverwaltung. Parameter gelten ab dem nächsten
+Modellstart und sind derzeit global. Skills sind hier editierbare Anweisungen.
+Der Diktatbutton erklärt den Einstieg in die Systemdiktierfunktion. Eine eigene
+Audioaufnahme oder Transkriptionsruntime ist noch offen.
+
+Im Gerätemodus öffnet **Gerät hinzufügen** den vollständigen Kopplungsdialog.
+Nach der Verbindung erscheint wieder das Chatfenster. Senden im Gerätemodus
+wartet auf die gemeinsame Inferenz aus NX-011. Die bisherigen Modellprüfungen
+und Demoansichten bleiben unter den erweiterten Einstellungen erreichbar.
+Der Zwei-Fenster-Kopplungstest und die bisherigen Runtime-Tests bleiben aktiv.
+
 Die UI verwendet Python/PySide6. Übersicht, Einrichtung und Demo-Sitzung zeigen
 simulierte Abläufe. Die getrennte Ansicht **Lokales Modell** führt auf dem Mac
 offline Textinferenz aus. Für Windows
