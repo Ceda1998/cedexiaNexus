@@ -2,12 +2,15 @@
 import argparse
 import hashlib
 import json
+import os
 from pathlib import Path
 import re
 import struct
 
 DEFAULT_MANIFEST = Path(__file__).resolve().parents[1] / "config/model-manifest.json"
 GGUF_HEADER = struct.Struct("<4sIQQ")
+SPLIT_NAME = re.compile(r"(.+)-(\d{5})-of-(\d{5})\.gguf", re.IGNORECASE)
+GGUF_SCALAR_SIZES = {0: 1, 1: 1, 2: 2, 3: 2, 4: 4, 5: 4, 6: 4, 7: 1, 10: 8, 11: 8, 12: 8}
 
 
 def inspect_gguf(path):
@@ -61,14 +64,98 @@ def verify(path, manifest):
     }
 
 
+def split_metadata(stream, size):
+    """Read the split markers without loading tensor data or tokenizer arrays into memory."""
+    def read(fmt):
+        length = struct.calcsize(fmt)
+        data = stream.read(length)
+        if len(data) != length:
+            raise ValueError("truncated GGUF metadata")
+        return struct.unpack(fmt, data)
+
+    def skip(length):
+        if stream.tell() + length > size:
+            raise ValueError("truncated GGUF metadata")
+        stream.seek(length, os.SEEK_CUR)
+
+    def skip_values(kind, count):
+        if kind == 8:
+            if count > (size - stream.tell()) // 8:
+                raise ValueError("truncated GGUF string array")
+            for _ in range(count):
+                skip(read("<Q")[0])
+        elif kind in GGUF_SCALAR_SIZES:
+            skip(GGUF_SCALAR_SIZES[kind] * count)
+        else:
+            raise ValueError("unknown GGUF value type")
+
+    _, _, _, count = read("<4sIQQ")
+    fields = {}
+    for _ in range(count):
+        key_length, = read("<Q")
+        if not 0 < key_length <= 65535:
+            raise ValueError("invalid GGUF key")
+        key = stream.read(key_length)
+        kind, = read("<I")
+        if key in (b"split.no", b"split.count"):
+            if kind != 2 or key in fields:
+                raise ValueError("invalid GGUF split metadata")
+            fields[key], = read("<H")
+        elif kind == 9:
+            element_kind, elements = read("<IQ")
+            skip_values(element_kind, elements)
+        else:
+            skip_values(kind, 1)
+    return fields.get(b"split.no", 0), fields.get(b"split.count", 1)
+
+
+def fingerprint_gguf(path):
+    """Fingerprint a single GGUF or the ordered parts of a conventionally named split GGUF."""
+    if match := SPLIT_NAME.fullmatch(path.name):
+        prefix, first, total = match.groups()
+        count = int(total)
+        if first != "00001" or not 2 <= count <= 999:
+            raise ValueError("first split part required")
+        paths = [path, *(path.with_name(f"{prefix}-{index:05d}-of-{total}{path.suffix}")
+                         for index in range(2, count + 1))]
+    else:
+        paths = [path]
+    size = 0
+    hashes = []
+    for index, part in enumerate(paths):
+        if inspect_gguf(part) is not None:
+            raise ValueError("invalid or missing GGUF part")
+        with part.open("rb") as stream:
+            before = os.fstat(stream.fileno())
+            part_index, count = split_metadata(stream, before.st_size)
+            if (part_index, max(count, 1)) != (index, len(paths)):
+                raise ValueError("GGUF parts do not match their metadata")
+            stream.seek(0)
+            digest = hashlib.file_digest(stream, "sha256").digest()
+        after = part.stat()
+        if (before.st_dev, before.st_ino, before.st_size, before.st_mtime_ns) != (
+            after.st_dev, after.st_ino, after.st_size, after.st_mtime_ns
+        ):
+            raise ValueError("GGUF changed during verification")
+        size += before.st_size
+        hashes.append(digest)
+    digest = (hashes[0] if len(hashes) == 1 else
+              hashlib.sha256(b"Nexus split GGUF v1\x00" + b"".join(hashes)).digest())
+    return {"sha256": digest.hex(), "size": size, "parts": len(paths)}
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("model", type=Path)
     parser.add_argument("--manifest", type=Path, default=DEFAULT_MANIFEST)
-    parser.add_argument("--gguf", action="store_true", help="check the GGUF header without matching a pinned artifact")
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument("--gguf", action="store_true", help="check the GGUF header without matching a pinned artifact")
+    mode.add_argument("--fingerprint-gguf", action="store_true", help="hash a GGUF and its conventionally named parts")
     args = parser.parse_args(argv)
     try:
-        if args.gguf:
+        if args.fingerprint_gguf:
+            result = fingerprint_gguf(args.model)
+        elif args.gguf:
             error = inspect_gguf(args.model)
             result = {"header_ok": error is None, "error": error}
         else:
@@ -76,12 +163,14 @@ def main(argv=None):
             result = verify(args.model, manifest)
     except (OSError, ValueError, KeyError, TypeError):
         # Do not disclose user paths, filenames or raw OS errors in reports.
-        if args.gguf:
+        if args.fingerprint_gguf:
+            result = {"error": "gguf_invalid_or_unreadable"}
+        elif args.gguf:
             result = {"header_ok": False, "error": "missing_or_unreadable"}
         else:
             result = {"verified": False, "error": "model_or_manifest_invalid_or_unreadable"}
     print(json.dumps(result, indent=2))
-    return 0 if result.get("header_ok", result.get("verified")) else 1
+    return 0 if result.get("header_ok", result.get("verified", "sha256" in result)) else 1
 
 
 if __name__ == "__main__":

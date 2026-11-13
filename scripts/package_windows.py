@@ -102,6 +102,15 @@ def smoke_package():
         )
         if json.loads(proof.stdout).get("header_ok") is not True:
             raise ValueError("The packaged model verifier did not accept a standalone GGUF header.")
+        data = struct.pack("<4sIQQ", b"GGUF", 3, 1, 0) + bytes(128)
+        model.write_bytes(data)
+        proof = subprocess.run(
+            [exe, "--verify-local-model", str(model), "--fingerprint-gguf"],
+            cwd=WORK, check=True, capture_output=True, timeout=30,
+        )
+        expected = {"sha256": hashlib.sha256(data).hexdigest(), "size": len(data), "parts": 1}
+        if json.loads(proof.stdout) != expected:
+            raise ValueError("The packaged verifier did not fingerprint the GGUF.")
 
 
 def stage_notices():
@@ -119,12 +128,17 @@ def stage_notices():
     for file in distribution("pyinstaller").files or ():
         if file.name in ("COPYING.txt", "LICENSE.txt") and ".dist-info" in str(file):
             shutil.copyfile(file.locate(), notices / f"PyInstaller-{file.name}")
+    for package in ("pyOpenSSL", "cryptography", "cffi", "pycparser"):
+        for file in distribution(package).files or ():
+            if file.parent.name == "licenses" and file.name.startswith("LICENSE"):
+                shutil.copyfile(file.locate(), notices / f"{package}-{file.name}.txt")
     shutil.copyfile(ROOT / "docs/windows-app.md", APP / "START.md")
     (notices / "Sources.txt").write_text(
         "Qt 6.8.3, PySide6 and Shiboken6 6.8.3 (LGPLv3), unmodified shared libraries.\n"
         "Qt source: https://download.qt.io/archive/qt/6.8/6.8.3/single/\n"
         "Qt for Python source: https://download.qt.io/official_releases/QtForPython/pyside6/\n"
         "The LGPL libraries in _internal may be replaced with compatible versions.\n"
+        "LAN TLS libraries: https://pypi.org/project/pyOpenSSL/ and https://pypi.org/project/cryptography/\n"
         f"llama.cpp (MIT): https://github.com/ggml-org/llama.cpp/tree/{REVISION}\n"
         "NVIDIA CUDA 13.5 runtime and cuBLAS: https://docs.nvidia.com/cuda/eula/index.html\n"
         "CUDA archives and SHA-256:\n"

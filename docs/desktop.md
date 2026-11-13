@@ -1,11 +1,45 @@
-# Desktop-Prototyp · Demo und lokales Modell
+# Desktop-App · Lokale Modelle und LAN-Verbindung
 
-Die UI verwendet Python/PySide6 und läuft ohne Netzwerkverbindung. Übersicht,
-Einrichtung, Geräte und Demo-Sitzung sind ausdrücklich simuliert. Die getrennte
-Ansicht **Lokales Modell** führt auf dem Mac Textinferenz aus. Für Windows
+Die UI verwendet Python/PySide6. Übersicht, Einrichtung und Demo-Sitzung zeigen
+simulierte Abläufe. Die getrennte Ansicht **Lokales Modell** führt auf dem Mac
+offline Textinferenz aus. Für Windows
 liefert NX-052 ein Paket mit derselben Ansicht und CUDA als Backend.
 Beide Apps merken sich die hinzugefügten Modellpfade und die letzte Auswahl.
 Prompts und Antworten bleiben im Speicher.
+
+## Geräte im LAN verbinden
+
+1. Auf beiden Geräten Cedexia Nexus mit NX-053 öffnen. Auf dem Mac einmalig
+   `.venv/bin/python -m pip install -r requirements-ui.txt` ausführen und
+   die App wie gewohnt starten. Auf Windows gehört die TLS-Bibliothek zum
+   vollständigen [EXE-Paket](windows-app.md).
+2. Auf dem Mac **Geräte verbinden** öffnen, die LAN-Schnittstelle auswählen,
+   **Einladung erstellen** klicken und den Code kopieren. Den Code vertraulich
+   an das beitretende Gerät weitergeben. Er gilt fünf Minuten und für einen
+   Beitritt. Windows kann die Einladung ebenfalls erstellen.
+3. Auf dem zweiten Gerät unter **Geräte verbinden** den Code einfügen und
+   **Beitreten** klicken. Bei einer Betriebssystemabfrage nur den lokalen
+   Netzwerkzugriff bzw. das private Netzwerk zulassen.
+4. Die App prüft die in **Lokales Modell** ausgewählten Dateien im Hintergrund.
+   Bei Split-GGUFs den ersten Teil auswählen und alle Teile im selben Ordner
+   belassen. Die Prüfung liest jede Datei vollständig. Je nach Größe und
+   Datenträger kann sie mehrere Minuten dauern.
+5. Bei unterschiedlichen oder fehlenden Gewichten kann das einladende Gerät
+   **Downloadhinweis senden**. Für das per SHA-256 erkannte Referenz-Qwen füllt
+   die App die gepinnte Hugging-Face-Adresse aus. Für andere Modelle die
+   öffentliche HTTPS-Adresse der genauen Datei oder des Split-Satzes einfügen.
+   Das zweite Gerät öffnet den Link auf Klick im Browser, lädt die Gewichte
+   dort und wählt sie in der App aus. **Gewichte erneut prüfen** erkennt eine
+   am selben Pfad ersetzte Datei.
+6. **Trennen** oder das Fenster schließen. Die Sitzung endet auch nach
+   zwei Stunden.
+
+Der Abgleich vergleicht SHA-256, Größe und Anzahl der Dateien. Unterschiedliche
+Namen sind bei identischem Inhalt möglich. Der Status beschreibt die geprüften
+Dateien zum Zeitpunkt des Abgleichs. Die Geräteansicht startet keinen
+Inferenzauftrag. Gemeinsame Modellberechnung wird separat in NX-011 geprüft.
+Die Verbindung verwendet IPv4 im selben privaten LAN. VPNs, isolierte
+Gastnetze und Host-Firewalls können den Zugriff verhindern.
 
 ## Lokales Modell in der UI testen
 

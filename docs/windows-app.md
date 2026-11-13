@@ -14,6 +14,10 @@ belassen. Die App prüft den GGUF-Dateikopf, danach lädt llama.cpp das Modell.
 Die UI akzeptiert auch GGUF-Dateien anderer Modelle und Quantisierungen.
 Die [Prüfung des festgelegten Benchmarkmodells](model.md) ist separat verfügbar.
 
+Unter **Geräte verbinden** kann die App einem Mac im selben LAN beitreten und
+den Downloadhinweis für die dort ausgewählte GGUF-Datei anzeigen.
+[Schritte für Einladung und Modellabgleich](desktop.md#geräte-im-lan-verbinden).
+
 Das Paket enthält Python, Qt, die vorgebaute llama.cpp-Runtime und die
 CUDA-Laufzeitbibliotheken. Für die Inferenz brauchst du einen kompatiblen
 [NVIDIA-Treiber für CUDA 13.5](https://docs.nvidia.com/cuda/cuda-toolkit-release-notes/)
@@ -34,7 +38,8 @@ Der Windows-Workflow baut das Paket mit PyInstaller 6.22.3 und PySide6 6.8.3.
 Die vorgebauten Windows-x64-Archive stammen aus
 [llama.cpp b12347](https://github.com/ggml-org/llama.cpp/releases/tag/b12347)
 und werden vor dem Entpacken gegen die gepinnten SHA-256-Werte geprüft.
-Die App nutzt ausschließlich das lokale Completion-Programm.
+Die Modellansicht nutzt das lokale Completion-Programm. Die Geräteansicht
+verwendet die gebündelten Python-TLS-Bibliotheken.
 Quellen und Lizenzdateien stehen im Paket unter `licenses`.
 Qt- und PySide-DLLs bleiben als separate Dateien im Paket austauschbar.
 
@@ -47,5 +52,6 @@ py -3 -m scripts.package_windows
 
 Das Ergebnis liegt unter `dist/CedexiaNexus`. Der Build prüft die
 Runtime-Version, die Geräteliste, das Starten des gebündelten Fensters sowie
-die GGUF-Kopfprüfung und die separate SHA-256-Prüfung in der EXE.
+die GGUF-Kopfprüfung, den GGUF-Fingerprint und die separate
+Benchmark-SHA-256-Prüfung in der EXE.
 Der GitHub-Runner prüft den Paketstart ohne Ziel-GPU oder Modellgewichte.

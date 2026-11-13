@@ -33,6 +33,7 @@ class LocalRunner(QObject):
     output = Signal(str)
     finished = Signal(str)
     busy_changed = Signal(bool)
+    model_changed = Signal()
 
     def __init__(self, parent=None, root=ROOT, timeout_ms=1800000):
         super().__init__(parent)
@@ -87,12 +88,15 @@ class LocalRunner(QObject):
 
     def select_model(self, path):
         if not self.busy:
+            previous = self.model
             path = str(Path(path).absolute()) if path else ""
             if path and path not in self.models:
                 self.models.append(path)
             self.model = Path(path) if path else None
             self.settings.setValue("local_model_paths", self.models)
             self.settings.setValue("local_model_path", path)
+            if self.model != previous:
+                self.model_changed.emit()
 
     def remove_model(self):
         if not self.busy and self.model is not None:
@@ -116,9 +120,12 @@ class LocalRunner(QObject):
         self.busy_changed.emit(True)
         self.status.emit("Modelldatei wird geprüft … Die Oberfläche bleibt bedienbar.")
         self.timer.start()
-        verifier = [VERIFY_FLAG] if self.frozen else ["-m", "scripts.verify_model"]
-        self._spawn("verify", sys.executable, [*verifier, str(self.model), "--gguf"])
+        self._spawn("verify", sys.executable, self.verifier_arguments("--gguf"))
         return True
+
+    def verifier_arguments(self, mode):
+        entry = [VERIFY_FLAG] if self.frozen else ["-m", "scripts.verify_model"]
+        return [*entry, str(self.model), mode]
 
     def _runtime_command(self):
         device, layers, context, predict = (

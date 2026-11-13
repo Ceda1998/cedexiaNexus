@@ -21,6 +21,10 @@ und Auswahl lokaler GGUF-Textmodelle. NX-046 ergänzt auf Mac und Windows eine
 gespeicherte Liste für eigene GGUF-Dateien. Der Paketstart ist unter Windows geprüft.
 Die CUDA-Inferenz auf dem physischen Zielgerät steht zur Abnahme aus.
 
+NX-053 ergänzt **Geräte verbinden**. Zwei Desktop-Apps können sich im selben
+LAN per Einmalcode verbinden, ihre ausgewählten GGUF-Gewichte vergleichen und
+bei einer Abweichung eine Bezugsquelle teilen. [Ablauf und Grenzen](docs/desktop.md#geräte-im-lan-verbinden).
+
 NX-005: Qwen3.8-27B Q4_K_M generiert lokal auf dem bestätigten M5-Mac Text mit
 Metal (65/65 Layer auf GPU). [Start und Nachweis](docs/mac-metal.md):
 `sh scripts/run_mac_model.sh "Deine kurze Frage"`. Dies ist ein begrenzter

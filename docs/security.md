@@ -35,6 +35,22 @@ Diagnose-Artefakte hoch. Öffentliche Fork-PRs erhalten keinen privilegierten
 
 ## Bekannte Risiken und späteres Freigabekriterium
 
+Die Desktop-Kopplung aus NX-053 öffnet nach **Einladung erstellen** einen
+temporären TCP-Listener auf der ausgewählten privaten IPv4-Adresse. Der
+Einmalcode enthält einen zufälligen 256-Bit-Schlüssel und den Fingerabdruck
+eines frisch erzeugten TLS-Zertifikats. Das zweite Gerät prüft den Fingerabdruck
+vor dem Senden des Schlüssels über TLS 1.3. Einladungen verfallen nach fünf
+Minuten. Nach erfolgreichem Beitritt schließt der Listener. Zertifikat, Schlüssel
+und Einladung werden nicht in Dateien gespeichert. Wenn möglich entfernt die
+App den kopierten Code nach Beitritt oder Ablauf aus der Zwischenablage.
+
+In der Sitzung werden Modellstatus, Dateiname, Größe, Anzahl der Teile,
+SHA-256 und auf Klick eine HTTPS-Bezugsquelle übertragen. Die App überträgt
+keine lokalen Pfade, Modellgewichte oder Prompts. Sie lädt keine Gewichte
+automatisch und ändert keine Firewallregeln. Wer die Einladung erhält, kann
+damit beitreten. Das Betriebssystem oder ein von ihm verwalteter
+Zwischenablageverlauf kann kopierte Inhalte länger behalten.
+
 Die [llama.cpp-RPC-Dokumentation](https://github.com/ggml-org/llama.cpp/blob/master/tools/rpc/README.md)
 stuft den RPC-Pfad als fragilen, unsicheren Proof of Concept ein. Niemals
 ungeschützt öffentlich oder in einer sensiblen Umgebung betreiben. Ein Heimnetz
