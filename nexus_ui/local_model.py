@@ -1,5 +1,6 @@
 """NX-042: asynchronous, single-process local inference; no server or shell."""
 import codecs
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -34,6 +35,7 @@ class LocalRunner(QObject):
     finished = Signal(str)
     busy_changed = Signal(bool)
     model_changed = Signal()
+    library_changed = Signal()
 
     def __init__(self, parent=None, root=ROOT, timeout_ms=1800000):
         super().__init__(parent)
@@ -92,22 +94,52 @@ class LocalRunner(QObject):
             return "Diese Modelldatei fehlt. Wähle eine vorhandene GGUF-Datei aus."
         return ""
 
+    def add_models(self, paths):
+        if self.busy:
+            return
+        updated = list(dict.fromkeys([*self.models, *(str(Path(path).absolute()) for path in paths)]))
+        if updated != self.models:
+            self.models = updated
+            self.settings.setValue("local_model_paths", updated)
+            self.library_changed.emit()
+
     def select_model(self, path):
         if not self.busy:
             previous = self.model
             path = str(Path(path).absolute()) if path else ""
-            if path and path not in self.models:
-                self.models.append(path)
+            if path:
+                self.add_models([path])
             self.model = Path(path) if path else None
-            self.settings.setValue("local_model_paths", self.models)
             self.settings.setValue("local_model_path", path)
             if self.model != previous:
                 self.model_changed.emit()
 
-    def remove_model(self):
-        if not self.busy and self.model is not None:
-            self.models.remove(str(self.model))
+    def remove_model(self, path=None):
+        path = Path(path) if path else self.model
+        if self.busy or str(path) not in self.models:
+            return
+        self.models.remove(str(path))
+        self.settings.setValue("local_model_paths", self.models)
+        if self.model == path:
             self.select_model(self.models[0] if self.models else "")
+        self.library_changed.emit()
+
+    def model_setting_key(self, path, key):
+        identifier = hashlib.sha256(os.fsencode(os.path.normcase(str(path)))).hexdigest()
+        return f"model_profiles/{identifier}/{key}"
+
+    def model_defaults(self):
+        return {"context": 4096 if self.windows else 16384,
+                "predict": -2 if self.windows else 8192, "reasoning": False, "windows_cpu": False}
+
+    def model_setting(self, path, key):
+        default = self.model_defaults()[key]
+        value_type = type(default)
+        legacy = self.settings.value(key, default, type=value_type)
+        return self.settings.value(self.model_setting_key(path, key), legacy, type=value_type)
+
+    def set_model_setting(self, path, key, value):
+        self.settings.setValue(self.model_setting_key(path, key), value)
 
     def start(self, prompt):
         if self.busy:
@@ -137,16 +169,14 @@ class LocalRunner(QObject):
         return [*entry, str(self.model), mode]
 
     def _runtime_command(self):
-        device, layers, context, predict = (
-            ("CUDA0", "auto", "4096", "-2") if self.windows else ("MTL0", "all", "16384", "8192")
-        )
+        device, layers = ("CUDA0", "auto") if self.windows else ("MTL0", "all")
         fit = "on" if self.windows else "off"
-        if self.windows and self.settings.value("windows_cpu", False, type=bool):
+        if self.windows and self.model_setting(self.model, "windows_cpu"):
             device, layers, fit = "none", "0", "off"
         input_args = ["--simple-io", "--escape"] if self.windows else ["--file", "/dev/stdin"]
-        context = str(self.settings.value("context", int(context), type=int))
-        predict = str(self.settings.value("predict", int(predict), type=int))
-        reasoning = "on" if self.settings.value("reasoning", False, type=bool) else "off"
+        context = str(self.model_setting(self.model, "context"))
+        predict = str(self.model_setting(self.model, "predict"))
+        reasoning = "on" if self.model_setting(self.model, "reasoning") else "off"
         return str(self.runtime), [
             "--model", str(self.model), "--offline", "--device", device,
             "--n-gpu-layers", layers, "--fit", fit, "--ctx-size", context,
@@ -351,8 +381,7 @@ class LocalModelPage(QWidget):
         self.output.setReadOnly(True)
         self.output.setAccessibleName("Echte lokale Modellausgabe, einschließlich möglichem Denktext")
         layout.addWidget(self.output, 1)
-        context_hint = ("4096 Kontexttokens für Eingabe und Ausgabe · 32 GPU-Layer (CUDA)"
-                        if self.runner.windows else "16384 Kontexttokens · maximal 8192 Ausgabetokens")
+        context_hint = "CUDA oder CPU, je nach Modellprofil" if self.runner.windows else "Metal"
         hint = QLabel(f"Einzelne Aufgaben ohne Gesprächsverlauf · {context_hint}\n"
                       "Bis 12000 Eingabezeichen · Zeitlimit 30 Minuten einschließlich Modellprüfung\n"
                       "Längere Antworten können abbrechen. Denktext kann sichtbar sein. Eingaben und Antworten werden nicht gespeichert.")

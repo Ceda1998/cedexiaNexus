@@ -15,6 +15,7 @@ try:
     from PySide6.QtWidgets import QApplication
     from nexus_ui.app import make_application
     from nexus_ui.workspace import Workspace, ChatStore
+    from nexus_ui.model_settings import ModelSettings
     from test_local_model import FixtureRunner
 except ModuleNotFoundError as exc:
     if exc.name != 'PySide6':
@@ -30,6 +31,38 @@ class WorkspaceTests(unittest.TestCase):
         while window.runner.busy and time.monotonic() < deadline:
             QTest.qWait(10)
         self.assertFalse(window.runner.busy)
+
+    def test_model_library_settings_are_independent_from_chat_selection(self):
+        make_application()
+        root = Path(self.enterContext(tempfile.TemporaryDirectory()))
+        settings = QSettings(str(root / 'settings.ini'), QSettings.Format.IniFormat)
+        settings.setValue('local_model_paths', [])
+        settings.setValue('context', 6144)
+        with patch('nexus_ui.local_model.QSettings', return_value=settings):
+            runner = FixtureRunner()
+            first, second = root / 'a' / 'model.gguf', root / 'b' / 'model.gguf'
+            runner.select_model(first)
+            runner.add_models([second])
+            window = Workspace(runner, root / 'chats.db')
+            self.addCleanup(self.close_workspace, window)
+            window.open_settings('Modelle')
+            panel = window.preferences.findChild(ModelSettings)
+            self.assertEqual(panel.library.count(), 2)
+            panel.select_path(second)
+            self.assertEqual(panel.path.text(), str(second))
+            self.assertEqual(runner.model, first)
+            self.assertEqual(panel.fields['context'].value(), 6144)
+            panel.fields['context'].setValue(2048)
+            panel.fields['reasoning'].setChecked(True)
+            self.assertEqual(runner.model_setting(first, 'context'), 6144)
+            restarted = FixtureRunner()
+            restarted.select_model(second)
+            _, args = restarted._runtime_command()
+            self.assertEqual(args[args.index('--ctx-size') + 1], '2048')
+            self.assertEqual(args[args.index('--reasoning') + 1], 'on')
+            panel.remove.click()
+            self.assertEqual(runner.models, [str(first)])
+            self.assertEqual(runner.model, first)
 
     def test_thinking_is_collapsed_across_streaming_and_restart(self):
         app, _ = make_application()
