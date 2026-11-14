@@ -149,6 +149,7 @@ class LocalModelTests(unittest.TestCase):
 
     def test_windows_cuda_error_is_reported_separately_from_gguf_validation(self):
         self.runner.windows = True
+        self.runner.runtime = Path(sys.executable)
         self.runner.generate_code = 'import sys; sys.stderr.write("CUDA error: no kernel image"); sys.exit(3)'
         self.runner.start("test")
         self.wait(lambda: not self.runner.busy)
