@@ -34,7 +34,8 @@ Papierkorb verschieben. Chats, Einstellungen und Modelldateien bleiben erhalten.
 3. Nach der Installation **Cedexia Nexus starten** auswählen oder das Startmenü nutzen.
 4. Unter **Einstellungen → Modelle → GGUF hinzufügen** das eigene Modell hinzufügen.
 
-Python, Qt, MCP-Client, llama.cpp und die CUDA-Laufzeitbibliotheken sind enthalten.
+Python, Qt, MCP-Client, llama.cpp und die CUDA- und OpenMP-Laufzeitbibliotheken
+sind enthalten.
 Python, Visual Studio und das CUDA-Toolkit müssen nicht separat installiert werden.
 Die App installiert sich standardmäßig unter `%LOCALAPPDATA%\Programs\Cedexia Nexus`
 für das aktuelle Konto, ohne Administratorrechte. Windows 10/11 x64 ist das Ziel.
@@ -89,7 +90,9 @@ Ausgaben: `dist/installers/`. Windows prüft Erstinstallation, erneute Installat
 Appstart und Deinstallation. macOS prüft die Appsignatur, installiert das PKG im
 Benutzerordner und startet die installierte App. Auf beiden Plattformen prüft die
 CI die Build-Kennung, die Moduswahl, den WLAN-Eintrag und den GGUF-Prüfpfad aus
-dem Chat. Diese Prüfungen enthalten keine Gewichte und belegen keine
+dem Chat. Unter Windows prüft sie zusätzlich die mitgelieferte `libomp.dll`
+und startet die installierte Runtime mit bereinigtem `PATH`. Diese Prüfungen
+enthalten keine Gewichte und belegen keine
 Windows-GPU-Inferenz oder verteilte Modellberechnung. Installer auf dem physischen
 Windows-Zielgerät und Gatekeeper/SmartScreen auf frischen Downloads sind separat
 abzunehmen.

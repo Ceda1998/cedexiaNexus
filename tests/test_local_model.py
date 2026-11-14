@@ -198,6 +198,25 @@ class LocalModelTests(unittest.TestCase):
             self.assertIn('--verify-local-model', arguments)
             runner.deleteLater()
 
+    def test_frozen_windows_reports_missing_openmp_before_model_start(self):
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            settings = QSettings(str(root / "settings.ini"), QSettings.Format.IniFormat)
+            with patch("nexus_ui.local_model.QSettings", return_value=settings), \
+                 patch("nexus_ui.local_model.platform.system", return_value="Windows"), \
+                 patch("nexus_ui.local_model.platform.machine", return_value="AMD64"):
+                runner = LocalRunner(root=root)
+                runner.frozen = True
+                runner.runtime = root / "llama-completion.exe"
+                runner.runtime.touch(mode=0o700)
+                with patch.object(runner, "_spawn") as spawn:
+                    self.assertIn("libomp.dll fehlt", runner.unavailable_reason())
+                    self.assertFalse(runner.start("Test"))
+                    spawn.assert_not_called()
+                runner.runtime.with_name("libomp.dll").touch()
+                self.assertIn("GGUF-Datei", runner.unavailable_reason())
+                runner.deleteLater()
+
     def test_windows_model_selection_persists_and_forgetting_keeps_files(self):
         with TemporaryDirectory() as directory:
             root = Path(directory)

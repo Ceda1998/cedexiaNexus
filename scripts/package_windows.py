@@ -3,6 +3,7 @@
 import hashlib
 from importlib.metadata import distribution
 import json
+import os
 from pathlib import Path
 from packaging.requirements import Requirement
 import platform
@@ -29,8 +30,9 @@ ARCHIVES = {
 RUNTIME_FILE = re.compile(
     r"llama-completion\.exe|llama(?:-common|-completion-impl)?\.dll|"
     r"ggml(?:-base|-cuda|-cpu(?:-[\w-]+)?)?\.dll|"
-    r"(?:cudart|cublas|cublasLt)64_\d+\.dll", re.IGNORECASE,
+    r"(?:cudart|cublas|cublasLt)64_\d+\.dll|libomp\.dll|LICENSE-LLVM-OpenMP", re.IGNORECASE,
 )
+OPENMP_LICENSE = "LICENSE-LLVM-OpenMP"
 
 
 def write_build_info(work):
@@ -72,9 +74,11 @@ def stage_runtime(runtime):
                     continue
                 with bundle.open(entry) as source, (runtime / filename).open("xb") as target:
                     shutil.copyfileobj(source, target)
-    required = ("llama-completion.exe", "llama.dll", "ggml.dll", "ggml-base.dll", "ggml-cuda.dll")
-    if any(not (runtime / name).is_file() for name in required):
-        raise ValueError("The release is missing a required llama.cpp file.")
+    required = ("llama-completion.exe", "llama.dll", "ggml.dll", "ggml-base.dll",
+                "ggml-cuda.dll", "libomp.dll", OPENMP_LICENSE)
+    for name in required:
+        if not (runtime / name).is_file():
+            raise ValueError(f"The release is missing {name}.")
     for prefix in ("ggml-cpu", "cudart64_", "cublas64_", "cublasLt64_"):
         if not list(runtime.glob(f"{prefix}*.dll")):
             raise ValueError(f"The release is missing {prefix} libraries.")
@@ -98,10 +102,18 @@ def stage_runtime(runtime):
 
 
 def smoke_package(executable=None, work=None):
-    exe = str(executable or APP / "CedexiaNexus.exe")
+    app = executable or APP / "CedexiaNexus.exe"
+    exe = str(app)
     work = work or WORK
     expected_build = json.loads((work / "build-info.json").read_text(encoding="utf-8"))
-    proof = subprocess.run([exe, "--smoke-test"], cwd=work, timeout=60, capture_output=True)
+    env = os.environ.copy()
+    if platform.system() == "Windows":
+        for path in ("_internal/runtime/libomp.dll", f"licenses/{OPENMP_LICENSE}"):
+            if not (app.parent / path).is_file():
+                raise ValueError(f"The packaged app is missing {path}.")
+        # Prevent a developer toolchain on the runner from supplying missing DLLs via PATH.
+        env["PATH"] = str(Path(env["SystemRoot"]) / "System32")
+    proof = subprocess.run([exe, "--smoke-test"], cwd=work, env=env, timeout=60, capture_output=True)
     if proof.returncode:
         raise RuntimeError(f"Packaged app smoke test failed: {proof.stderr.decode(errors='replace').strip()}")
     lines = proof.stdout.splitlines()
@@ -181,6 +193,8 @@ def stage_notices(destination=None):
             if any(part.endswith('.dist-info') for part in file.parts) and file.name.upper().startswith(("LICENSE", "COPYING", "NOTICE")):
                 shutil.copyfile(file.locate(), notices / f"{package}-{file.name}.txt")
     shutil.copyfile(ROOT / "docs/installation.md", destination / "START.md")
+    if platform.system() == 'Windows':
+        (destination / "_internal/runtime" / OPENMP_LICENSE).replace(notices / OPENMP_LICENSE)
     (notices / "Sources.txt").write_text(
         "Qt 6.8.3, PySide6 and Shiboken6 6.8.3 (LGPLv3), unmodified shared libraries.\n"
         "Qt source: https://download.qt.io/archive/qt/6.8/6.8.3/single/\n"
@@ -189,7 +203,8 @@ def stage_notices(destination=None):
         "LAN TLS libraries: https://pypi.org/project/pyOpenSSL/ and https://pypi.org/project/cryptography/\n"
         "MCP Python SDK: https://github.com/modelcontextprotocol/python-sdk (MIT)\n"
         f"llama.cpp (MIT): https://github.com/ggml-org/llama.cpp/tree/{REVISION}\n"
-        + ("NVIDIA CUDA 13.5 runtime and cuBLAS: https://docs.nvidia.com/cuda/eula/index.html\n"
+        + ("LLVM OpenMP 20.1.8 (libomp.dll): https://github.com/llvm/llvm-project/tree/llvmorg-20.1.8/openmp\n"
+        "NVIDIA CUDA 13.5 runtime and cuBLAS: https://docs.nvidia.com/cuda/eula/index.html\n"
         "CUDA archives and SHA-256:\n"
         + "".join(f"{RELEASE}{name}  {digest}\n" for name, digest in ARCHIVES.items()) if platform.system() == 'Windows' else ''),
         encoding="utf-8",

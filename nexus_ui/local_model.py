@@ -84,6 +84,8 @@ class LocalRunner(QObject):
             if self.windows:
                 return "CUDA-Runtime fehlt. Entpacke das vollständige Windows-Paket."
             return "Lokale Runtime fehlt. Installiere die App erneut oder richte den Metal-Build aus NX-005 ein."
+        if self.windows and self.frozen and not self.runtime.with_name("libomp.dll").is_file():
+            return "Die Windows-Runtime ist unvollständig: libomp.dll fehlt. Installiere Cedexia Nexus erneut."
         if self.model is None:
             return "Füge eine lokale GGUF-Datei hinzu."
         if not self.model.is_file():
