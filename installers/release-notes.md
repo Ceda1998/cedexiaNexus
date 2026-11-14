@@ -4,6 +4,8 @@ Einzelgerät und Mehrgeräte sind direkt in der Seitenleiste sichtbar. Für die 
 
 **Geräte im Netz suchen** zeigt andere Cedexia-Nexus-Instanzen, die dieselbe Suche im lokalen Netz gestartet haben. Kopplungsanfragen werden auf beiden Geräten bestätigt. Unter **Einstellungen → Modelle** lassen sich Kontext, Ausgabelimit und Reasoning pro Modell einstellen.
 
+Bei einer manuellen Einladung lässt sich der Einladungscode über **Code anzeigen** einblenden und danach wieder ausblenden.
+
 - **macOS:** `CedexiaNexus-macOS-arm64-<Version>.pkg` für Apple Silicon, macOS 14+. Installation ins eigene Benutzerkonto unter `~/Applications`.
 - **Windows:** `CedexiaNexus-Windows-x64-Setup-<Version>.exe` für Windows 10/11 x64. Der Installer liefert die zuvor fehlende `libomp.dll` mit, die llama.cpp zum Start braucht. Die App passt GPU-Layer automatisch an den Speicher an und bietet in den Modelleinstellungen einen CPU-Gegencheck. Für GPU-Inferenz ist ein kompatibler NVIDIA-Treiber erforderlich. Die CUDA-Laufzeitbibliotheken sind enthalten.
 

@@ -14,6 +14,7 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 try:
     from PySide6.QtCore import QSettings
     from PySide6.QtNetwork import QNetworkInterface
+    from PySide6.QtWidgets import QLineEdit
     from nexus_ui.app import NexusWindow, make_application
     from nexus_ui.device_pairing import pinned_source
     from nexus_ui.device_discovery import ANNOUNCEMENT, DiscoveredPeer, parse_announcement
@@ -185,6 +186,21 @@ class DevicePairingTests(unittest.TestCase):
         self.wait_for(lambda: bool(host.code.text()) or host.thread is None)
         self.assertTrue(host.code.text(), host.status.text())
         code = host.code.text()
+        self.assertEqual(host.code.echoMode(), QLineEdit.EchoMode.Password)
+        self.assertTrue(host.reveal_code.isVisible())
+        host.reveal_code.click()
+        self.assertTrue(host.code_preview.isVisible())
+        self.assertEqual(host.code_preview.toPlainText(), code)
+        self.assertEqual(host.reveal_code.text(), "Code ausblenden")
+        host.reveal_code.click()
+        self.assertFalse(host.code_preview.isVisible())
+        self.assertFalse(host.code_preview.toPlainText())
+        host.reveal_code.click()
+        host_window.hide()
+        self.assertFalse(host.code_preview.toPlainText())
+        host_window.show()
+        self.assertTrue(host.reveal_code.isVisible())
+        host.reveal_code.click()
         address, port, fingerprint, secret = read_invitation(code)
         for wrong in (make_invitation(address, port, bytes(32), secret),
                       make_invitation(address, port, fingerprint, bytes(32))):
@@ -201,6 +217,8 @@ class DevicePairingTests(unittest.TestCase):
         self.wait_for(lambda: host.share.isVisible())
         self.assertIn("fehlt", host.comparison.text())
         self.assertEqual(host.code.text(), "")
+        self.assertFalse(host.code_preview.toPlainText())
+        self.assertFalse(host.reveal_code.isVisible())
         peer.runner.select_model(windows_model)
         self.wait_for(lambda: "unterscheiden" in host.comparison.text())
         self.wait_for(lambda: "unterscheiden" in peer.comparison.text())

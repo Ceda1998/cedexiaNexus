@@ -5,11 +5,11 @@ import sys
 from urllib.parse import quote
 
 from PySide6.QtCore import QProcess, QTimer, Qt, QUrl, Signal
-from PySide6.QtGui import QDesktopServices
+from PySide6.QtGui import QDesktopServices, QTextOption
 from PySide6.QtNetwork import QNetworkInterface
 from PySide6.QtWidgets import (
     QApplication, QComboBox, QFormLayout, QHBoxLayout, QLabel, QLineEdit,
-    QPushButton, QVBoxLayout, QWidget,
+    QPlainTextEdit, QPushButton, QVBoxLayout, QWidget,
 )
 
 from .pairing_transport import PairingThread, lan_address, valid_source
@@ -173,12 +173,27 @@ class DevicePairingPage(QWidget):
         self.code.setAccessibleName("Einladungscode")
         self.code.setPlaceholderText("Code vom einladenden Gerät")
         self.code.setEchoMode(QLineEdit.EchoMode.Password)
+        self.reveal_code = QPushButton("Code anzeigen")
+        self.reveal_code.setCheckable(True)
+        self.reveal_code.toggled.connect(self.show_invitation_code)
         self.copy = action("Code kopieren", self.copy_invitation)
         self.join = action("Beitreten", self.start_join)
         code_row = QHBoxLayout()
-        for widget in (self.code, self.copy, self.join):
-            code_row.addWidget(widget)
+        code_row.addWidget(self.code, 1)
+        code_row.addWidget(self.join)
         form.addRow("Einladungscode", code_row)
+        self.code_preview = QPlainTextEdit()
+        self.code_preview.setAccessibleName("Sichtbarer Einladungscode")
+        self.code_preview.setReadOnly(True)
+        self.code_preview.setWordWrapMode(QTextOption.WrapMode.WrapAnywhere)
+        self.code_preview.setMaximumHeight(90)
+        self.code_preview.hide()
+        form.addRow(self.code_preview)
+        code_actions = QHBoxLayout()
+        code_actions.addWidget(self.reveal_code)
+        code_actions.addWidget(self.copy)
+        code_actions.addStretch()
+        form.addRow("", code_actions)
         layout.addLayout(form)
         self.disconnect = action("Trennen", self.close_session)
         layout.addWidget(self.disconnect)
@@ -351,6 +366,7 @@ class DevicePairingPage(QWidget):
             self.refresh()
 
     def hideEvent(self, event):
+        self.reveal_code.setChecked(False)
         if self.thread is not None and self.thread.uses_discovery and not self.connected:
             self.close_session()
         super().hideEvent(event)
@@ -387,8 +403,13 @@ class DevicePairingPage(QWidget):
         if self.thread is None or self.thread.cancelled.is_set():
             return
         self.code.setText(code)
-        self.status.setText("Code kopieren und auf dem zweiten Gerät einfügen. Die Einladung gilt fünf Minuten.")
+        self.status.setText("Einladungscode anzeigen oder kopieren und auf dem zweiten Gerät eingeben. Die Einladung gilt fünf Minuten.")
         self.refresh()
+
+    def show_invitation_code(self, visible):
+        self.code_preview.setPlainText(self.code.text() if visible else "")
+        self.code_preview.setVisible(visible)
+        self.reveal_code.setText("Code ausblenden" if visible else "Code anzeigen")
 
     def copy_invitation(self):
         if self.copy.isEnabled():
@@ -564,9 +585,15 @@ class DevicePairingPage(QWidget):
         self.accept.setEnabled(not self.approval_sent)
         self.decline.setEnabled(not self.approval_sent)
         self.code.setReadOnly(active)
+        self.join.setVisible(not active)
         self.join.setEnabled(not active and has_address and bool(self.code.text().strip()))
-        self.copy.setVisible(active and self.hosting and not self.connected)
-        self.copy.setEnabled(active and bool(self.code.text()))
+        has_invitation = (active and self.hosting and not self.thread.cancelled.is_set()
+                          and not self.connected and bool(self.code.text()))
+        if not has_invitation:
+            self.reveal_code.setChecked(False)
+        self.reveal_code.setVisible(has_invitation)
+        self.copy.setVisible(has_invitation)
+        self.copy.setEnabled(has_invitation)
         self.disconnect.setEnabled(active)
         self.recheck.setEnabled(self.probe.state() == QProcess.ProcessState.NotRunning
                                 and self.local_model["state"] != "checking")

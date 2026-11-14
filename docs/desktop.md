@@ -134,8 +134,10 @@ Modellgewichte und belegen keine Modellqualität oder verteilte Inferenz.
    **Kopplung anfragen** klicken. Gleichen Prüfcode auf beiden Geräten
    vergleichen und auf beiden bestätigen. Bei einer Systemabfrage den Zugriff
    auf das lokale beziehungsweise private Netzwerk erlauben.
-   Alternativ **Einladung erstellen** wählen, den Code vertraulich weitergeben
-   und auf dem zweiten Gerät mit **Beitreten** verbinden.
+   Alternativ **Einladung erstellen** wählen. Mit **Code anzeigen** lässt sich
+   der Einladungscode einblenden, mit **Code ausblenden** wieder verdecken.
+   Den Code vertraulich weitergeben und auf dem zweiten Gerät mit **Beitreten**
+   verbinden. **Code kopieren** übernimmt ihn direkt in die Zwischenablage.
 4. Die App prüft die in **Lokales Modell** ausgewählten Dateien im Hintergrund.
    Bei Split-GGUFs den ersten Teil auswählen und alle Teile im selben Ordner
    belassen. Die Prüfung liest jede Datei vollständig. Je nach Größe und
