@@ -10,6 +10,7 @@ from urllib.parse import urlsplit
 import uuid
 
 from PySide6.QtCore import QThread, Signal, Qt
+from PySide6.QtGui import QFontDatabase, QKeySequence, QShortcut
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QListWidget,
     QListWidgetItem, QLineEdit, QPlainTextEdit, QPushButton, QFileDialog,
     QMessageBox, QComboBox, QLabel, QFormLayout)
@@ -81,27 +82,85 @@ class SkillEditor(QWidget):
         super().__init__()
         self.store = store
         self.identifier = None
-        layout = QVBoxLayout(self)
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(16)
+        library = QVBoxLayout()
+        self.search = QLineEdit()
+        self.search.setPlaceholderText('Skills suchen …')
+        self.search.setAccessibleName('Skills suchen')
+        self.search.setClearButtonEnabled(True)
+        self.search.setToolTip('Nach Name und Markdown-Inhalt suchen')
+        library.addWidget(self.search)
+        self.search.returnPressed.connect(self.select_first_result)
+        focus_search = QShortcut(QKeySequence(QKeySequence.StandardKey.Find), self)
+        focus_search.setContext(Qt.ShortcutContext.WidgetWithChildrenShortcut)
+        focus_search.activated.connect(self.focus_search)
+        clear_search = QShortcut(QKeySequence('Escape'), self.search)
+        clear_search.setContext(Qt.ShortcutContext.WidgetShortcut)
+        clear_search.activated.connect(self.search.clear)
+        self.search.textChanged.connect(lambda text: clear_search.setEnabled(bool(text)))
+        clear_search.setEnabled(False)
         self.list = QListWidget()
-        self.list.setMaximumHeight(170)
-        layout.addWidget(self.list)
+        self.list.setObjectName('skillList')
+        self.list.setAccessibleName('Skillbibliothek')
+        library.addWidget(self.list, 1)
+        self.results = QLabel()
+        self.results.setObjectName('libraryStatus')
+        self.results.setAccessibleName('Suchergebnisse')
+        self.results.setWordWrap(True)
+        library.addWidget(self.results)
+        library_actions = QHBoxLayout()
+        button('Neu', self.new, library_actions)
+        button('Importieren …', self.import_file, library_actions)
+        library.addLayout(library_actions)
+        layout.addLayout(library, 2)
+
+        detail = QVBoxLayout()
+        name_label = QLabel('Name')
+        name_label.setObjectName('libraryLabel')
+        detail.addWidget(name_label)
         self.name = QLineEdit()
-        self.name.setPlaceholderText('Skillname')
+        self.name.setPlaceholderText('Name des Skills')
         self.name.setMaxLength(100)
         self.name.setAccessibleName('Skillname')
+        name_label.setBuddy(self.name)
+        detail.addWidget(self.name)
+        markdown_label = QLabel('Markdown')
+        markdown_label.setObjectName('libraryLabel')
+        detail.addWidget(markdown_label)
         self.editor = QPlainTextEdit()
+        self.editor.setFont(QFontDatabase.systemFont(QFontDatabase.SystemFont.FixedFont))
         self.editor.setPlaceholderText('# Mein Skill\n\nAnweisungen für das Modell …')
         self.editor.setAccessibleName('Skill als Markdown')
-        layout.addWidget(self.name)
-        layout.addWidget(self.editor, 1)
+        markdown_label.setBuddy(self.editor)
+        detail.addWidget(self.editor, 1)
         actions = QHBoxLayout()
-        button('Neu', self.new, actions)
-        button('Markdown importieren …', self.import_file, actions)
-        button('Speichern', self.save, actions)
-        button('Löschen', self.remove, actions)
-        layout.addLayout(actions)
+        self.delete_button = button('Löschen', self.remove, actions)
+        self.delete_button.setProperty('quiet', True)
+        self.delete_button.setProperty('danger', True)
+        actions.addStretch()
+        self.save_button = button('Speichern', self.save, actions)
+        self.save_button.setProperty('primary', True)
+        detail.addLayout(actions)
+        layout.addLayout(detail, 3)
+        self.search.textChanged.connect(self.filter_list)
+        self.name.textChanged.connect(self.refresh_actions)
+        self.editor.textChanged.connect(self.refresh_actions)
         self.list.currentItemChanged.connect(self.select)
         self.reload()
+
+    def focus_search(self):
+        self.search.setFocus()
+        self.search.selectAll()
+
+    def select_first_result(self):
+        for index in range(self.list.count()):
+            item = self.list.item(index)
+            if not item.isHidden():
+                self.list.setCurrentItem(item)
+                self.list.setFocus()
+                break
 
     def reload(self):
         self.list.blockSignals(True)
@@ -110,19 +169,56 @@ class SkillEditor(QWidget):
             item = QListWidgetItem(name)
             item.setData(Qt.ItemDataRole.UserRole, (identifier, name, markdown))
             self.list.addItem(item)
+            if identifier == self.identifier:
+                self.list.setCurrentItem(item)
         self.list.blockSignals(False)
+        self.filter_list(self.search.text())
+        self.refresh_actions()
+
+    def filter_list(self, text):
+        terms = text.casefold().split()
+        visible = 0
+        self.list.blockSignals(True)
+        for index in range(self.list.count()):
+            item = self.list.item(index)
+            identifier, name, markdown = item.data(Qt.ItemDataRole.UserRole)
+            haystack = (name + '\n' + markdown).casefold()
+            matches = all(term in haystack for term in terms)
+            item.setHidden(not matches)
+            if matches:
+                visible += 1
+                if identifier == self.identifier:
+                    self.list.setCurrentItem(item)
+        self.list.blockSignals(False)
+        if not self.list.count():
+            self.results.setText('Noch keine Skills vorhanden.')
+        elif not visible:
+            self.results.setText('Keine passenden Skills.')
+        elif terms:
+            self.results.setText(f'{visible} von {self.list.count()} Skills')
+        else:
+            self.results.setText('1 Skill' if visible == 1 else f'{visible} Skills')
+
+    def refresh_actions(self):
+        self.save_button.setEnabled(bool(self.name.text().strip() and self.editor.toPlainText().strip()))
+        self.delete_button.setEnabled(self.identifier is not None)
 
     def select(self, item, previous):
         if item:
-            self.identifier, name, markdown = item.data(Qt.ItemDataRole.UserRole)
+            identifier, name, markdown = item.data(Qt.ItemDataRole.UserRole)
+            if identifier == self.identifier:
+                return
+            self.identifier = identifier
             self.name.setText(name)
             self.editor.setPlainText(markdown)
+            self.refresh_actions()
 
     def new(self):
         self.identifier = None
-        self.list.clearSelection()
+        self.list.setCurrentRow(-1)
         self.name.clear()
         self.editor.clear()
+        self.refresh_actions()
         self.name.setFocus()
 
     def import_file(self):

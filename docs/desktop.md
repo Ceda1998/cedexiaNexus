@@ -8,6 +8,10 @@ Modellgewichte. [Download, Installation und Updates](installation.md).
 NX-054 und NX-055 öffnen die App mit einer einklappbaren Sidebar, Projekten und
 Chats. Der Composer unten enthält die Modellauswahl, MCPs, Skills, Diktateinstieg,
 Senden und Stoppen. GGUF-Dateien werden unter **Einstellungen → Modelle** hinzugefügt.
+Mit NX-059 orientiert sich die Oberfläche an Desktop-Anwendungen von 2019–2022.
+Eine kompakte Werkzeugleiste, dezente Auswahlfarben und kürzere Nachrichtenblöcke
+geben dem Chatinhalt mehr Platz. Im Einstellungsfenster stehen die Bereiche in
+der linken Leiste. Helles und dunkles Erscheinungsbild verwenden dieselbe Anordnung.
 Nachrichten werden pro Chat in einer SQLite-Datenbank im lokalen
 App-Datenverzeichnis gespeichert. Beim Neustart öffnet sich der zuletzt
 angelegte Chat. Chats lassen sich nach Bestätigung löschen. Die Datenbank ist
@@ -60,6 +64,11 @@ Beide Apps merken sich die hinzugefügten Modellpfade und die letzte Auswahl.
 Prompts und Antworten bleiben im Speicher.
 
 ## Skills und MCPs (NX-057)
+
+Die Suche oben in der Skillbibliothek durchsucht Namen und Markdown-Inhalt.
+Mit **Strg+F** bzw. **⌘F** springt der Fokus in das Suchfeld. **Enter** wählt
+den ersten Treffer, **Esc** im Suchfeld setzt den Filter zurück. Der Editor
+behält beim Filtern seine aktuellen Eingaben.
 
 Unter **Einstellungen → Skills** können UTF-8-Markdown-Dateien (`.md`, auch
 `SKILL.md`, bis 128 KiB) importiert, neu erstellt, bearbeitet und gelöscht werden.

@@ -5,11 +5,11 @@ import platform
 import sqlite3
 import uuid
 
-from PySide6.QtCore import Qt, QStandardPaths, QTimer
+from PySide6.QtCore import QSize, Qt, QStandardPaths, QTimer
 from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QPushButton, QLabel, QComboBox, QTreeWidget, QTreeWidgetItem, QPlainTextEdit,
-    QDialog, QTabWidget, QFormLayout, QSpinBox, QCheckBox,
+    QDialog, QListWidget, QStackedWidget, QFormLayout, QSpinBox, QCheckBox,
     QInputDialog, QMessageBox, QFileDialog, QMenu, QScrollArea)
 
 from .local_model import LocalRunner
@@ -17,6 +17,7 @@ from .device_pairing import DevicePairingPage
 from .integrations import IntegrationStore, SkillEditor, McpPanel
 from .chat_output import split_reply
 from .chat_transcript import ChatTranscript
+from .workspace_theme import DARK, LIGHT, workspace_style
 
 
 class ChatStore:
@@ -68,60 +69,103 @@ class Workspace(QMainWindow):
         self.setCentralWidget(body)
         outer = QHBoxLayout(body)
         outer.setContentsMargins(0, 0, 0, 0)
+        outer.setSpacing(0)
         self.sidebar = QWidget()
         self.sidebar.setObjectName('sidebar')
-        self.sidebar.setFixedWidth(270)
+        self.sidebar.setFixedWidth(230)
         side = QVBoxLayout(self.sidebar)
-        side.setContentsMargins(20, 24, 20, 20)
-        side.addWidget(QLabel('CEDEXIA NEXUS'))
+        side.setContentsMargins(14, 20, 14, 14)
+        side.setSpacing(7)
+        brand = QLabel('Cedexia Nexus')
+        brand.setObjectName('workspaceBrand')
+        side.addWidget(brand)
         self.mode = QComboBox()
         self.mode.addItems(['Lokal · Einzelmodell', 'Verbundene Geräte'])
         self.mode.setAccessibleName('Ausführungsmodus')
         side.addWidget(self.mode)
         self.add_device = self.button('+ Gerät hinzufügen', self.open_devices, side)
+        commands = QHBoxLayout()
+        self.new_project = self.button('+ Projekt', self.create_project, commands)
+        self.new_chat = self.button('+ Chat', self.create_chat, commands)
+        side.addLayout(commands)
+        projects = QLabel('Projekte und Chats')
+        projects.setObjectName('sidebarLabel')
+        side.addSpacing(10)
+        side.addWidget(projects)
         self.tree = QTreeWidget()
+        self.tree.setObjectName('chatTree')
+        self.tree.setIndentation(16)
         self.tree.setHeaderHidden(True)
         self.tree.setAccessibleName('Projekte und Chats')
         side.addWidget(self.tree, 1)
-        self.new_project = self.button('+ Projekt', self.create_project, side)
-        self.new_chat = self.button('+ Chat', self.create_chat, side)
         self.delete_chat = self.button('Chat löschen', self.remove_chat, side)
-        self.button('⚙  Einstellungen', self.open_settings, side)
-        from .app import icon
-        side.itemAt(side.count() - 1).widget().setIcon(icon('settings'))
-        side.itemAt(side.count() - 1).widget().setText('Einstellungen')
+        self.settings_button = self.button('Einstellungen', self.open_settings, side)
+        for action in (self.delete_chat, self.settings_button):
+            action.setProperty('quiet', True)
+            action.setProperty('sidebarAction', True)
         outer.addWidget(self.sidebar)
         main = QVBoxLayout()
-        main.setContentsMargins(28, 20, 28, 22)
+        main.setContentsMargins(24, 14, 24, 18)
+        main.setSpacing(9)
         outer.addLayout(main, 1)
         header = QHBoxLayout()
-        self.toggle = self.button('☰', self.toggle_sidebar, header)
+        self.toggle = self.button('', self.toggle_sidebar, header)
+        self.toggle.setFixedWidth(35)
+        self.toggle.setProperty('quiet', True)
         self.toggle.setAccessibleName('Sidebar ein- oder ausblenden')
+        self.toggle.setToolTip(self.toggle.accessibleName())
         self.title = QLabel('Neuer Chat')
-        header.addWidget(self.title, 1)
-        self.button('Antwort kopieren', self.copy_answer, header)
-        main.addLayout(header)
+        self.title.setObjectName('workspaceTitle')
+        self.title.setTextFormat(Qt.TextFormat.PlainText)
+        self.title.setWordWrap(True)
         self.status = QLabel('')
+        self.status.setObjectName('workspaceStatus')
+        self.status.setTextFormat(Qt.TextFormat.PlainText)
         self.status.setWordWrap(True)
-        main.addWidget(self.status)
+        title_group = QVBoxLayout()
+        title_group.setSpacing(2)
+        title_group.addWidget(self.title)
+        title_group.addWidget(self.status)
+        header.addLayout(title_group, 1)
+        self.copy_button = self.button('Antwort kopieren', self.copy_answer, header)
+        self.copy_button.setProperty('quiet', True)
+        main.addLayout(header)
         self.transcript = ChatTranscript(self.open_link)
         main.addWidget(self.transcript, 1)
+        composer_panel = QWidget()
+        composer_panel.setObjectName('composer')
+        composer_panel.setAttribute(Qt.WidgetAttribute.WA_StyledBackground)
+        composer_panel.setMaximumWidth(860)
+        entry = QVBoxLayout(composer_panel)
+        entry.setContentsMargins(9, 8, 9, 9)
+        entry.setSpacing(6)
         self.prompt = QPlainTextEdit()
-        self.prompt.setPlaceholderText('Stelle deinem Modell eine Aufgabe …')
-        self.prompt.setMaximumHeight(140)
+        self.prompt.setObjectName('chatPrompt')
+        self.prompt.setPlaceholderText('Nachricht schreiben …')
+        self.prompt.setFixedHeight(84)
         self.prompt.setAccessibleName('Nachricht')
-        main.addWidget(self.prompt)
+        entry.addWidget(self.prompt)
         composer = QHBoxLayout()
         self.models = QComboBox()
         self.models.setAccessibleName('Modell für diesen Chat')
+        self.models.setPlaceholderText('Modell auswählen')
+        self.models.setMinimumWidth(120)
+        self.models.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon)
         composer.addWidget(self.models, 1)
         self.mcp_button = self.button('MCPs', lambda: self.integration_menu('mcps'), composer)
         self.skill_button = self.button('Skills', lambda: self.integration_menu('skills'), composer)
         self.dictate = self.button('Diktieren', self.dictation, composer)
+        for action in (self.mcp_button, self.skill_button, self.dictate):
+            action.setProperty('quiet', True)
         self.send = self.button('Senden', self.submit, composer)
         self.send.setProperty('primary', True)
         self.stop = self.button('Stoppen', lambda: self.runner.stop('Antwort gestoppt.'), composer)
-        main.addLayout(composer)
+        entry.addLayout(composer)
+        composer_row = QHBoxLayout()
+        composer_row.addStretch()
+        composer_row.addWidget(composer_panel, 100)
+        composer_row.addStretch()
+        main.addLayout(composer_row)
         self.devices = QDialog(self)
         self.devices.setWindowTitle('Gerät hinzufügen · Cedexia Nexus')
         self.devices.resize(820, 760)
@@ -234,6 +278,7 @@ class Workspace(QMainWindow):
             self.chat_id = None
             self.messages = []
             self.pending_context = ''
+            self.title.setText('Neuer Chat')
             self.refresh_tree()
             self.transcript.clear()
             self.render()
@@ -318,6 +363,7 @@ class Workspace(QMainWindow):
             if not self.runner.input_truncated:
                 self.messages[-1].update(text=reply.answer, thinking=reply.thinking)
         self.transcript.render(self.messages, self.stream is not None)
+        self.copy_button.setEnabled(any(m['role'] == 'assistant' and m['text'] for m in self.messages))
 
     def finished(self, status):
         self.render_timer.stop()
@@ -376,34 +422,57 @@ class Workspace(QMainWindow):
         self.setFont(font)
 
     def apply_theme(self):
+        from .app import icon
         dark = self.settings.value('dark_theme', False, type=bool)
-        background, panel, foreground, border = ('#141D2B', '#1D293B', '#E9EEF6', '#41516B') if dark else ('#F5F6F8', '#FFFFFF', '#162033', '#D8DEE8')
-        self.setStyleSheet(f'''QWidget {{ background: {background}; color: {foreground}; }}
-            QWidget#sidebar {{ background: {panel}; border-right: 1px solid {border}; }}
-            QTreeWidget {{ background: {background}; border: 0; padding: 12px; }}
-            QScrollArea#chatTranscript, QTextBrowser {{ border: 0; }}
-            QWidget#chatMessage[role="user"], QWidget#chatMessage[role="user"] QLabel,
-            QWidget#chatMessage[role="user"] QTextBrowser {{ background: {panel}; }}
-            QWidget#chatMessage[role="user"] {{ border: 1px solid {border}; border-radius: 8px; }}
-            QLabel#messageAuthor {{ font-weight: bold; }}
-            QPlainTextEdit, QComboBox {{ background: {panel}; border: 1px solid {border}; padding: 10px; }}
-            QPushButton {{ background: {panel}; border: 1px solid {border}; padding: 9px 12px; }}
-            QPushButton[primary="true"] {{ background: #173B70; color: white; }}
-            QPushButton#thinkingToggle:focus {{ border: 2px solid #537EBA; padding: 8px 11px; }}
-            QTreeWidget::item:selected {{ background: #173B70; color: white; }}
-            QTreeWidget::item {{ padding: 8px; }}''')
+        colors = DARK if dark else LIGHT
+        self.setStyleSheet(workspace_style(colors))
+        self.toggle.setIcon(icon('layout-dashboard', colors['muted']))
+        self.settings_button.setIcon(icon('settings', colors['muted']))
+        for action in (self.toggle, self.settings_button):
+            action.setIconSize(QSize(16, 16))
 
     def open_settings(self, section=None):
         if self.preferences is None:
             self.preferences = QDialog(self)
             self.preferences.setWindowTitle('Einstellungen · Cedexia Nexus')
-            self.preferences.resize(860, 680)
-            layout = QVBoxLayout(self.preferences)
-            tabs = QTabWidget()
-            self.settings_tabs = tabs
-            layout.addWidget(tabs)
+            self.preferences.resize(960, 610)
+            layout = QHBoxLayout(self.preferences)
+            layout.setContentsMargins(0, 0, 0, 0)
+            layout.setSpacing(0)
+            sidebar = QWidget()
+            sidebar.setObjectName('settingsSidebar')
+            sidebar.setFixedWidth(178)
+            sidebar.setAttribute(Qt.WidgetAttribute.WA_StyledBackground)
+            navigation = QVBoxLayout(sidebar)
+            navigation.setContentsMargins(12, 20, 12, 12)
+            label = QLabel('Einstellungen')
+            label.setObjectName('workspaceBrand')
+            navigation.addWidget(label)
+            self.settings_navigation = QListWidget()
+            self.settings_navigation.setObjectName('settingsNavigation')
+            self.settings_navigation.setAccessibleName('Einstellungsbereiche')
+            navigation.addWidget(self.settings_navigation, 1)
+            advanced = self.button('Prüfung und Demo', self.open_advanced, navigation)
+            advanced.setProperty('quiet', True)
+            layout.addWidget(sidebar)
+            content = QVBoxLayout()
+            content.setContentsMargins(22, 18, 22, 18)
+            content.setSpacing(14)
+            section_title = QLabel()
+            section_title.setObjectName('settingsTitle')
+            content.addWidget(section_title)
+            pages = QStackedWidget()
+            content.addWidget(pages, 1)
+            layout.addLayout(content, 1)
+
+            def add_page(page, title):
+                self.settings_navigation.addItem(title)
+                pages.addWidget(page)
+
             appearance = QWidget()
             form = QFormLayout(appearance)
+            form.setContentsMargins(0, 0, 0, 0)
+            form.setSpacing(12)
             size = QSpinBox()
             size.setRange(9, 20)
             size.setValue(self.settings.value('font_size', 11, type=int))
@@ -413,10 +482,15 @@ class Workspace(QMainWindow):
             dark.setChecked(self.settings.value('dark_theme', False, type=bool))
             dark.toggled.connect(lambda value: (self.settings.setValue('dark_theme', value), self.apply_theme()))
             form.addRow(dark)
-            tabs.addTab(appearance, 'Erscheinungsbild')
+            add_page(appearance, 'Erscheinungsbild')
             models = QWidget()
             form = QFormLayout(models)
-            form.addRow(QLabel('Gilt ab dem nächsten Modellstart. Ein größerer Kontext benötigt mehr Speicher.'))
+            form.setContentsMargins(0, 0, 0, 0)
+            form.setSpacing(12)
+            notes = QLabel('Gilt ab dem nächsten Modellstart. Ein größerer Kontext benötigt mehr Speicher.')
+            notes.setWordWrap(True)
+            notes.setObjectName('libraryStatus')
+            form.addRow(notes)
             for key, title, default, minimum, maximum in [('context', 'Kontexttokens', 4096 if self.runner.windows else 16384, 512, 131072), ('predict', 'Ausgabetokens', 2048, 1, 8192)]:
                 field = QSpinBox()
                 field.setRange(minimum, maximum)
@@ -427,33 +501,44 @@ class Workspace(QMainWindow):
             reasoning.setChecked(self.settings.value('reasoning', False, type=bool))
             reasoning.toggled.connect(lambda value: self.settings.setValue('reasoning', value))
             form.addRow(reasoning)
-            self.button('Modelle hinzufügen', self.pick_model, form)
-            self.button('Ausgewähltes Modell aus Liste entfernen', self.forget_model, form)
-            tabs.addTab(models, 'Modelle')
+            actions = QHBoxLayout()
+            self.button('Modelle hinzufügen …', self.pick_model, actions).setProperty('primary', True)
+            self.button('Auswahl entfernen', self.forget_model, actions)
+            actions.addStretch()
+            form.addRow(actions)
+            add_page(models, 'Modelle')
             speech = QWidget()
             speech_layout = QVBoxLayout(speech)
-            self.button('Systemdiktat verwenden', self.dictation, speech_layout)
+            speech_layout.setContentsMargins(0, 0, 0, 0)
+            speech_button = self.button('Systemdiktat verwenden', self.dictation, speech_layout)
+            speech_layout.setAlignment(speech_button, Qt.AlignmentFlag.AlignLeft)
             speech_layout.addStretch()
-            tabs.addTab(speech, 'Spracheingabe')
+            add_page(speech, 'Spracheingabe')
             skills = SkillEditor(self.integrations)
             skills.changed.connect(self.refresh_integrations)
-            tabs.addTab(skills, 'Skills')
+            add_page(skills, 'Skills')
             mcp_scroll = QScrollArea()
             mcp_scroll.setWidgetResizable(True)
             mcp_scroll.setWidget(self.mcp_panel)
-            tabs.addTab(mcp_scroll, 'MCPs')
+            add_page(mcp_scroll, 'MCPs')
             devices = QWidget()
             devices_layout = QVBoxLayout(devices)
-            self.button('Geräteverbindung verwalten', self.open_devices, devices_layout)
+            devices_layout.setContentsMargins(0, 0, 0, 0)
+            device_button = self.button('Geräteverbindung verwalten', self.open_devices, devices_layout)
+            devices_layout.setAlignment(device_button, Qt.AlignmentFlag.AlignLeft)
             devices_layout.addStretch()
-            tabs.addTab(devices, 'Geräte')
-            self.button('Erweiterte Modellprüfung und Demo öffnen', self.open_advanced, layout)
+            add_page(devices, 'Geräte')
+            self.settings_navigation.currentRowChanged.connect(pages.setCurrentIndex)
+            self.settings_navigation.currentTextChanged.connect(section_title.setText)
+            self.settings_navigation.setCurrentRow(0)
         if section:
-            for index in range(self.settings_tabs.count()):
-                if self.settings_tabs.tabText(index) == section:
-                    self.settings_tabs.setCurrentIndex(index)
+            matches = self.settings_navigation.findItems(section, Qt.MatchFlag.MatchExactly)
+            if matches:
+                self.settings_navigation.setCurrentItem(matches[0])
         self.preferences.show()
         self.preferences.raise_()
+        if section == 'Skills':
+            self.preferences.findChild(SkillEditor).focus_search()
 
     def refresh_integrations(self):
         self.skill_button.setText(f'Skills ({len(self.integrations.active(self.chat_id, "skills"))})')

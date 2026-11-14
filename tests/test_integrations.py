@@ -11,7 +11,8 @@ from unittest.mock import patch, Mock
 
 os.environ.setdefault('QT_QPA_PLATFORM', 'offscreen')
 try:
-    from PySide6.QtCore import QSettings
+    from PySide6.QtCore import QSettings, Qt
+    from PySide6.QtTest import QTest
     from nexus_ui.app import make_application
     from nexus_ui.integrations import IntegrationStore, McpConnection, McpPanel, SkillEditor
     from nexus_ui.workspace import ChatStore
@@ -23,6 +24,40 @@ except ModuleNotFoundError as error:
 
 @unittest.skipIf(IntegrationStore is None, 'Install requirements-ui.txt')
 class IntegrationTests(unittest.TestCase):
+    def test_skill_search_keeps_unsaved_editor_content(self):
+        app, _ = make_application()
+        root = Path(self.enterContext(tempfile.TemporaryDirectory()))
+        settings = QSettings(str(root / 's.ini'), QSettings.Format.IniFormat)
+        store = ChatStore(root / 'chats.db')
+        self.addCleanup(store.db.close)
+        integrations = IntegrationStore(store.db, settings)
+        first = integrations.save_skill(None, 'Lektorat', 'Prüfe Grammatik.')
+        second = integrations.save_skill(None, 'Übersetzung', 'Antworte auf Spanisch.')
+        editor = SkillEditor(integrations)
+        self.addCleanup(editor.close)
+        editor.show()
+        editor.list.setCurrentRow(0)
+        self.assertEqual(editor.identifier, first)
+        editor.editor.setPlainText('Nicht gespeicherter Entwurf')
+        editor.search.setText('SPANISCH übersetzung')
+        self.assertTrue(editor.list.item(0).isHidden())
+        self.assertFalse(editor.list.item(1).isHidden())
+        self.assertEqual(editor.identifier, first)
+        self.assertEqual(editor.editor.toPlainText(), 'Nicht gespeicherter Entwurf')
+        editor.search.setText('kein Treffer')
+        self.assertEqual(editor.results.text(), 'Keine passenden Skills.')
+        editor.focus_search()
+        app.processEvents()
+        QTest.keyClick(editor.search, Qt.Key.Key_Escape)
+        self.assertEqual(editor.search.text(), '')
+        self.assertEqual(editor.list.currentItem().text(), 'Lektorat')
+        self.assertEqual(editor.editor.toPlainText(), 'Nicht gespeicherter Entwurf')
+        editor.search.setText('spanisch')
+        QTest.keyClick(editor.search, Qt.Key.Key_Return)
+        self.assertEqual(editor.identifier, second)
+        self.assertEqual(editor.editor.toPlainText(), 'Antworte auf Spanisch.')
+        self.assertEqual(integrations.skills()[0][2], 'Prüfe Grammatik.')
+
     def test_tools_require_chat_activation_and_results_stay_with_chat(self):
         app, _ = make_application()
         with tempfile.TemporaryDirectory() as directory:
