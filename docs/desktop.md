@@ -122,7 +122,11 @@ Modellgewichte und belegen keine Modellqualität oder verteilte Inferenz.
 2. Auf beiden Geräten **Mehrgeräte → Geräte verbinden …** öffnen. Bei
    **Verbindung** auf jedem Gerät separat **Ethernet (LAN)** oder **WLAN**
    wählen. Unter **Adapter** die passende lokale IPv4-Adresse wählen.
-   Nach einem Netzwechsel **Aktualisieren** klicken. Falls das Betriebssystem
+   **WLAN** zeigt nur aktive WLAN-Adapter und den Namen des verbundenen
+   Netzes. Auf dem Mac bei Bedarf **WLAN-Namen freigeben …** klicken, die
+   macOS-Ortungsfreigabe erteilen und **Aktualisieren** wählen. Der Netzname
+   bleibt auf dem Gerät. Nach einem Netzwechsel **Aktualisieren** klicken.
+   Falls das Betriebssystem
    den Adaptertyp nicht eindeutig meldet, zeigt **Manuelle Auswahl** alle
    aktiven Adapter mit privater IPv4-Adresse.
 3. Auf einem Gerät **Einladung erstellen** wählen und den Code vertraulich

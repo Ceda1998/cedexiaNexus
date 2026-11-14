@@ -83,7 +83,7 @@ class DevicePairingTests(unittest.TestCase):
         addresses = patch("nexus_ui.pairing_transport.LAN_NETWORKS", (ipaddress.ip_network("127.0.0.0/8"),))
         addresses.start()
         self.addCleanup(addresses.stop)
-        wifi = {"127.0.0.1": ("WLAN-Testadapter", QNetworkInterface.InterfaceType.Wifi)}
+        wifi = {"127.0.0.1": ("WLAN-Testadapter", QNetworkInterface.InterfaceType.Wifi, "Testnetz")}
         adapters = patch("nexus_ui.device_pairing.lan_interfaces", return_value=wifi)
         adapters.start()
         self.addCleanup(adapters.stop)
@@ -140,9 +140,9 @@ class DevicePairingTests(unittest.TestCase):
         interface = QNetworkInterface.InterfaceType
         ethernet, wifi, unknown = "192.0.2.10", "192.0.2.20", "192.0.2.30"
         detected = {
-            ethernet: ("Kabel", interface.Ethernet),
-            wifi: ("Funk", interface.Wifi),
-            unknown: ("Sonstiger Adapter", interface.Unknown),
+            ethernet: ("Kabel", interface.Ethernet, ""),
+            wifi: ("Funk", interface.Wifi, "Testnetz"),
+            unknown: ("Sonstiger Adapter", interface.Unknown, ""),
         }
         with patch("nexus_ui.device_pairing.lan_interfaces", return_value=detected):
             page = self.window(root, "network-options").pairing
@@ -151,6 +151,11 @@ class DevicePairingTests(unittest.TestCase):
             page.connection_type.setCurrentText("WLAN")
             self.assertEqual(page.interfaces.currentData(), wifi)
             self.assertEqual(page.interfaces.count(), 1)
+            self.assertEqual(page.wifi_name.text(), "Verbundenes WLAN: Testnetz")
+            detected[wifi] = ("Funk", interface.Wifi, "")
+            page.reload_interfaces()
+            self.assertIn("nicht verfügbar", page.wifi_name.text())
+            self.assertTrue(page.host.isEnabled())
             page.connection_type.setCurrentText("Manuelle Auswahl")
             self.assertEqual(page.interfaces.count(), 3)
             page.interfaces.setCurrentIndex(page.interfaces.findData(unknown))
@@ -161,4 +166,4 @@ class DevicePairingTests(unittest.TestCase):
             page.code.setText("Einladung")
             self.assertFalse(page.join.isEnabled())
             self.assertFalse(page.host.isEnabled())
-            self.assertIn("Manuelle Auswahl", page.network_hint.text())
+            self.assertIn("Kein aktives WLAN", page.network_hint.text())

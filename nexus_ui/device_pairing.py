@@ -13,6 +13,7 @@ from PySide6.QtWidgets import (
 )
 
 from .pairing_transport import PairingThread, lan_address, valid_source
+from .wifi_status import connected_wifi
 
 MISSING_MODEL = {"type": "model", "state": "missing"}
 CONNECTION_TYPES = (
@@ -24,6 +25,7 @@ CONNECTION_TYPES = (
 
 def lan_interfaces():
     addresses = {}
+    wifi = connected_wifi()
     for interface in QNetworkInterface.allInterfaces():
         if not interface.flags() & QNetworkInterface.InterfaceFlag.IsRunning:
             continue
@@ -33,7 +35,9 @@ def lan_interfaces():
                 lan_address(address)
             except ValueError:
                 continue
-            addresses[address] = (interface.humanReadableName(), interface.type())
+            adapter = interface.name().strip("{}").lower()
+            kind = QNetworkInterface.InterfaceType.Wifi if adapter in wifi else interface.type()
+            addresses[address] = (interface.humanReadableName(), kind, wifi.get(adapter, ""))
     return addresses
 
 
@@ -121,6 +125,9 @@ class DevicePairingPage(QWidget):
         self.interfaces.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon)
         self.interfaces.setMinimumContentsLength(14)
         self.network_hint = plain_label("")
+        self.wifi_name = plain_label("")
+        self.wifi_names = {}
+        self.location_manager = None
         self.host = action("Einladung erstellen", self.start_host)
         self.reload = action("Aktualisieren", self.reload_interfaces)
         self.reload.setToolTip("Netzwerkadapter neu einlesen")
@@ -128,6 +135,9 @@ class DevicePairingPage(QWidget):
         host_row.addWidget(self.interfaces, 1)
         host_row.addWidget(self.reload)
         form.addRow("Adapter", host_row)
+        form.addRow(self.wifi_name)
+        self.read_wifi = action("WLAN-Namen freigeben …", self.request_wifi_name)
+        form.addRow(self.read_wifi)
         form.addRow(self.network_hint)
         form.addRow(self.host)
         self.code = QLineEdit()
@@ -169,6 +179,7 @@ class DevicePairingPage(QWidget):
             layout.addWidget(widget)
         layout.addStretch()
         self.interfaces.currentIndexChanged.connect(self.refresh)
+        self.interfaces.currentIndexChanged.connect(self.show_wifi_name)
         self.connection_type.currentIndexChanged.connect(self.reload_interfaces)
         self.code.textChanged.connect(self.refresh)
         self.source.textChanged.connect(self.source_changed)
@@ -179,7 +190,7 @@ class DevicePairingPage(QWidget):
         previous = self.interfaces.currentData()
         adapters = lan_interfaces()
         if self.connection_type.currentIndex() < 0:
-            known = [kind for _, kind in adapters.values()]
+            known = [kind for _, kind, _ in adapters.values()]
             first = next((index for index, (kind, _) in enumerate(CONNECTION_TYPES[:-1])
                           if kind in known), len(CONNECTION_TYPES) - 1)
             self.connection_type.blockSignals(True)
@@ -188,9 +199,11 @@ class DevicePairingPage(QWidget):
         kind, label = CONNECTION_TYPES[self.connection_type.currentIndex()]
         self.interfaces.blockSignals(True)
         self.interfaces.clear()
-        for address, (name, detected) in adapters.items():
+        self.wifi_names = {}
+        for address, (name, detected, ssid) in adapters.items():
             if kind is None or kind == detected:
                 self.interfaces.addItem(f"{name} · {address}", address)
+                self.wifi_names[address] = ssid
         if previous and (index := self.interfaces.findData(previous)) >= 0:
             self.interfaces.setCurrentIndex(index)
         self.interfaces.blockSignals(False)
@@ -200,10 +213,36 @@ class DevicePairingPage(QWidget):
             self.network_hint.setText("Wähle den Adapter, der mit dem Netz des anderen Geräts verbunden ist.")
         else:
             self.network_hint.clear()
-        if kind is not None and self.interfaces.count() == 0 and adapters:
+        if kind == QNetworkInterface.InterfaceType.Wifi and self.interfaces.count() == 0:
+            self.network_hint.setText("Kein aktives WLAN erkannt. Verbinde dieses Gerät in den Systemeinstellungen mit einem WLAN und klicke dann auf „Aktualisieren“.")
+        elif kind is not None and self.interfaces.count() == 0 and adapters:
             self.network_hint.setText(f"Kein Adapter für {label} erkannt. Wähle bei Bedarf „Manuelle Auswahl“.")
         self.network_hint.setVisible(bool(self.network_hint.text()))
+        self.show_wifi_name()
         self.refresh()
+
+    def show_wifi_name(self):
+        wifi_selected = self.connection_type.currentText() == "WLAN" and bool(self.interfaces.currentData())
+        name = self.wifi_names.get(self.interfaces.currentData(), "")
+        self.wifi_name.setText(f"Verbundenes WLAN: {name}" if name else
+                               "WLAN verbunden. Der Netzwerkname ist vom System nicht verfügbar.")
+        self.wifi_name.setVisible(wifi_selected)
+        self.read_wifi.setVisible(wifi_selected and not name and sys.platform == "darwin")
+
+    def request_wifi_name(self):
+        try:
+            from CoreLocation import CLLocationManager, kCLAuthorizationStatusDenied, kCLAuthorizationStatusRestricted
+
+            if self.location_manager is None:
+                self.location_manager = CLLocationManager.alloc().init()
+            denied = (kCLAuthorizationStatusDenied, kCLAuthorizationStatusRestricted)
+            if self.location_manager.authorizationStatus() in denied:
+                self.wifi_name.setText("Prüfe den Zugriff unter Systemeinstellungen → Datenschutz & Sicherheit → Ortungsdienste.")
+            else:
+                self.location_manager.requestWhenInUseAuthorization()
+                self.wifi_name.setText("WLAN-Name: Nach der macOS-Freigabe auf „Aktualisieren“ klicken.")
+        except (ImportError, RuntimeError):
+            self.wifi_name.setText("WLAN-Name ist in diesem Build nicht verfügbar.")
 
     def start_host(self):
         if self.thread is None and (address := self.interfaces.currentData()):

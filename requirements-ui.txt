@@ -2,3 +2,11 @@ PySide6==6.8.3
 cryptography==50.0.2
 pyOpenSSL==26.4.0
 mcp==2.3.0
+winrt-runtime==3.2.1; sys_platform == "win32"
+winrt-Windows.Networking.Connectivity==3.2.1; sys_platform == "win32"
+winrt-Windows.Foundation==3.2.1; sys_platform == "win32"
+winrt-Windows.Foundation.Collections==3.2.1; sys_platform == "win32"
+pyobjc-core==12.2.2; sys_platform == "darwin"
+pyobjc-framework-Cocoa==12.2.2; sys_platform == "darwin"
+pyobjc-framework-CoreWLAN==12.2.2; sys_platform == "darwin"
+pyobjc-framework-CoreLocation==12.2.2; sys_platform == "darwin"
