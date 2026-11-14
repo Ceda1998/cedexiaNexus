@@ -88,10 +88,17 @@ jobs:
         run: |
           cd release-files
           sha256sum --check *.sha256
+          version="$(tr -d '\r\n' < ../installers/version.txt)"
+          for name in CedexiaNexus-Windows-x64-Setup.exe CedexiaNexus-macOS-arm64.pkg; do
+            versioned="${name%.*}-${version}.${name##*.}"
+            mv "$name" "$versioned"
+            rm "$name.sha256"
+            sha256sum "$versioned" > "$versioned.sha256"
+          done
           cd ..
           release_tag="desktop-${GITHUB_SHA:0:7}"
           if gh release view "$release_tag" >/dev/null 2>&1; then
             echo "Release already exists; immutable installer files are retained."
           else
-            gh release create "$release_tag" release-files/* --target "$GITHUB_SHA" --title "Cedexia Nexus · ${GITHUB_SHA:0:7}" --prerelease --notes-file installers/release-notes.md
+            gh release create "$release_tag" release-files/* --target "$GITHUB_SHA" --title "Cedexia Nexus $version · ${GITHUB_SHA:0:7}" --prerelease --notes-file installers/release-notes.md
           fi

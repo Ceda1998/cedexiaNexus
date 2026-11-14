@@ -147,6 +147,14 @@ class LocalModelTests(unittest.TestCase):
         self.assertIn("fehlgeschlagen", self.results[0])
         self.assertNotIn("SECRET", self.results[0])
 
+    def test_windows_cuda_error_is_reported_separately_from_gguf_validation(self):
+        self.runner.windows = True
+        self.runner.generate_code = 'import sys; sys.stderr.write("CUDA error: no kernel image"); sys.exit(3)'
+        self.runner.start("test")
+        self.wait(lambda: not self.runner.busy)
+        self.assertIn("CUDA konnte", self.results[0])
+        self.assertIn("CPU", self.results[0])
+
     def test_window_close_kills_child_and_keeps_ui_responsive(self):
         self.runner.generate_code = 'import time; print("first",flush=True); time.sleep(30)'
         window = NexusWindow(local_runner=self.runner)

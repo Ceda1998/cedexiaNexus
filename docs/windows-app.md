@@ -29,8 +29,11 @@ CUDA-Laufzeitbibliotheken. Für die Inferenz brauchst du einen kompatiblen
 [NVIDIA-Treiber für CUDA 13.5](https://docs.nvidia.com/cuda/cuda-toolkit-release-notes/)
 und ein GGUF-Textmodell, dessen Architektur und Quantisierung die gebündelte
 llama.cpp-Version unterstützt und das in den verfügbaren Speicher passt.
-Windows x64 und eine RTX 5070 Ti sind das erste Ziel. Der CUDA-Testpfad nutzt 32 GPU-Layer und
-4096 Kontexttokens. Windows-CUDA-Inferenz muss auf dem Ziel-PC abgenommen werden.
+Windows x64 und eine RTX 5070 Ti sind das erste Ziel. Der CUDA-Pfad passt
+die GPU-Layer an den verfügbaren Speicher an. Standardmäßig sind 4096
+Kontexttokens eingestellt. Bei einem CUDA-Ladefehler lässt sich unter
+**Einstellungen → Modelle → CPU statt NVIDIA-GPU verwenden** dieselbe Datei auf der
+CPU gegenprüfen. Windows-CUDA-Inferenz muss auf dem Ziel-PC abgenommen werden.
 Das Paket ist ein unsignierter Testbuild.
 
 Erster geprüfter Paketlauf für Commit `a6ccd6f`.

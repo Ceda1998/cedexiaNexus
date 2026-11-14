@@ -136,15 +136,18 @@ class LocalRunner(QObject):
 
     def _runtime_command(self):
         device, layers, context, predict = (
-            ("CUDA0", "32", "4096", "-2") if self.windows else ("MTL0", "all", "16384", "8192")
+            ("CUDA0", "auto", "4096", "-2") if self.windows else ("MTL0", "all", "16384", "8192")
         )
+        fit = "on" if self.windows else "off"
+        if self.windows and self.settings.value("windows_cpu", False, type=bool):
+            device, layers, fit = "none", "0", "off"
         input_args = ["--simple-io", "--escape"] if self.windows else ["--file", "/dev/stdin"]
         context = str(self.settings.value("context", int(context), type=int))
         predict = str(self.settings.value("predict", int(predict), type=int))
         reasoning = "on" if self.settings.value("reasoning", False, type=bool) else "off"
         return str(self.runtime), [
             "--model", str(self.model), "--offline", "--device", device,
-            "--n-gpu-layers", layers, "--fit", "off", "--ctx-size", context,
+            "--n-gpu-layers", layers, "--fit", fit, "--ctx-size", context,
             "--batch-size", "128", "--ubatch-size", "128", "--threads", "4",
             "--predict", predict, "--seed", "42", "--temp", "0", "--jinja",
             "--conversation", "--single-turn", "--reasoning", reasoning,
@@ -221,11 +224,21 @@ class LocalRunner(QObject):
         log = self.diagnostics.lower()
         if b"unknown model architecture" in log:
             return "Die Architektur dieses GGUF-Modells wird von der gebündelten Runtime nicht unterstützt."
-        if b"out of memory" in log or b"failed to allocate" in log:
-            return "Für dieses Modell ist nicht genug freier Speicher verfügbar. Versuche eine kleinere Quantisierung."
-        if b"invalid device" in log or b"failed to initialize cuda" in log:
-            return "Die Runtime findet das CUDA-Gerät nicht. Prüfe den NVIDIA-Treiber."
-        return "Modelllauf fehlgeschlagen. Prüfe GGUF-Kompatibilität, freien Speicher und bei geteilten Modellen alle Dateiteile."
+        if any(message in log for message in (b"out of memory", b"failed to allocate", b"bad_alloc")):
+            return "Nicht genug freier Speicher. Verkleinere den Kontext oder wähle eine kleinere Quantisierung."
+        if self.windows and any(message in log for message in (
+            b"invalid device", b"failed to initialize cuda", b"cuda error", b"no kernel image",
+        )):
+            return ("CUDA konnte das Modell nicht ausführen. Prüfe den NVIDIA-Treiber. "
+                    "Zum Gegencheck kannst du unter Einstellungen → Modelle die CPU wählen.")
+        if b"failed to open gguf file" in log or b"failed to open file" in log:
+            return "Die Runtime konnte eine Modelldatei nicht öffnen. Prüfe Zugriffsrechte und alle Teile einer geteilten GGUF."
+        if b"gguf_init_from_file" in log or b"gguf_init_from_reader" in log or b"wrong number of tensors" in log:
+            return "Die Runtime konnte die GGUF-Daten nicht lesen. Prüfe, ob der Download vollständig ist."
+        if self.windows and b"error loading model" not in log and not self.received:
+            return ("Windows-Runtime fehlgeschlagen. Prüfe den NVIDIA-Treiber oder "
+                    "teste unter Einstellungen → Modelle mit der CPU.")
+        return "Modelllauf fehlgeschlagen, nachdem der GGUF-Dateikopf geprüft wurde."
 
     def _dispose(self, proc):
         self.process = None
@@ -249,7 +262,7 @@ class LocalRunner(QObject):
                 valid, error = False, None
             self.proof.clear()
             if not valid:
-                self._finish(error or "Modellprüfung fehlgeschlagen. Prüfe die lokale GGUF-Datei.")
+                self._finish(error or "Die App konnte die Modellprüfung nicht abschließen. Prüfe den installierten Build.")
             else:
                 self.status.emit("Lokales Modell wird geladen …")
                 self._spawn("generate", *self._runtime_command())

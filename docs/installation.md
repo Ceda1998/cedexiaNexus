@@ -2,12 +2,14 @@
 
 Fertige Installationsdateien stehen unter den
 [GitHub-Releases dieses Repositorys](https://github.com/Ceda1998/cedexiaNexus/releases).
+Wähle dort das aktuelle **Cedexia Nexus**-Testrelease anhand der Versionsnummer
+im Titel. Nach dem Start zeigt die Titelleiste dieselbe Version und den Kurz-Commit.
 Die Installerquellen liegen in `installers/`, die Builds in `scripts/`.
 Binärdateien werden als Release-Downloads bereitgestellt, nicht in Git eingecheckt.
 
 ## macOS · Apple Silicon
 
-1. `CedexiaNexus-macOS-arm64.pkg` herunterladen und doppelklicken.
+1. `CedexiaNexus-macOS-arm64-<Version>.pkg` herunterladen und doppelklicken.
 2. Einführung und Hinweise lesen, mit **Fortfahren** bestätigen und für das
    eigene Benutzerkonto installieren. Ziel ist `~/Applications/Cedexia Nexus.app`.
 3. Die App im Finder aus diesem Ordner starten.
@@ -27,7 +29,7 @@ Papierkorb verschieben. Chats, Einstellungen und Modelldateien bleiben erhalten.
 
 ## Windows · x64
 
-1. `CedexiaNexus-Windows-x64-Setup.exe` herunterladen und starten.
+1. `CedexiaNexus-Windows-x64-Setup-<Version>.exe` herunterladen und starten.
 2. Hinweise lesen, Zielordner wählen und optional eine Desktop-Verknüpfung anlegen.
 3. Nach der Installation **Cedexia Nexus starten** auswählen oder das Startmenü nutzen.
 4. Unter **Einstellungen → Modelle → GGUF hinzufügen** das eigene Modell hinzufügen.
@@ -84,9 +86,10 @@ py -3 -m scripts.package_installers
 ```
 
 Ausgaben: `dist/installers/`. Windows prüft Erstinstallation, erneute Installation,
-Appstart, Modellverifier und Deinstallation. macOS prüft Appsignatur, Start und
-Modellverifier; die CI installiert zusätzlich das PKG im Benutzerordner und startet
-die installierte App. Diese Prüfungen enthalten keine Gewichte und belegen keine
+Appstart und Deinstallation. macOS prüft die Appsignatur, installiert das PKG im
+Benutzerordner und startet die installierte App. Auf beiden Plattformen prüft die
+CI die Build-Kennung, die Moduswahl, den WLAN-Eintrag und den GGUF-Prüfpfad aus
+dem Chat. Diese Prüfungen enthalten keine Gewichte und belegen keine
 Windows-GPU-Inferenz oder verteilte Modellberechnung. Installer auf dem physischen
 Windows-Zielgerät und Gatekeeper/SmartScreen auf frischen Downloads sind separat
 abzunehmen.

@@ -18,6 +18,7 @@ from .integrations import IntegrationStore, SkillEditor, McpPanel
 from .chat_output import split_reply
 from .chat_transcript import ChatTranscript
 from .workspace_theme import DARK, LIGHT, workspace_style
+from .build_info import build_info
 
 
 class ChatStore:
@@ -49,7 +50,8 @@ class ChatStore:
 class Workspace(QMainWindow):
     def __init__(self, runner=None, storage=None):
         super().__init__()
-        self.setWindowTitle('Cedexia Nexus')
+        build = build_info()
+        self.setWindowTitle(f"Cedexia Nexus {build['version']} · {build['revision']}")
         self.resize(1240, 850)
         self.setMinimumSize(850, 650)
         self.runner = runner or LocalRunner(self)
@@ -531,6 +533,11 @@ class Workspace(QMainWindow):
             reasoning.setChecked(self.settings.value('reasoning', False, type=bool))
             reasoning.toggled.connect(lambda value: self.settings.setValue('reasoning', value))
             form.addRow(reasoning)
+            if self.runner.windows:
+                cpu = QCheckBox('CPU statt NVIDIA-GPU verwenden')
+                cpu.setChecked(self.settings.value('windows_cpu', False, type=bool))
+                cpu.toggled.connect(lambda value: self.settings.setValue('windows_cpu', value))
+                form.addRow(cpu)
             actions = QHBoxLayout()
             self.button('Modelle hinzufügen …', self.pick_model, actions).setProperty('primary', True)
             self.button('Auswahl entfernen', self.forget_model, actions)

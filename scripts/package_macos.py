@@ -11,7 +11,7 @@ import sys
 import tarfile
 import xml.etree.ElementTree as ET
 
-from scripts.package_windows import ROOT, REVISION, RELEASE, download, stage_notices, smoke_package
+from scripts.package_windows import ROOT, REVISION, RELEASE, download, stage_notices, smoke_package, write_build_info
 
 WORK = ROOT / 'local/mac-package'
 APP = ROOT / 'dist/Cedexia Nexus.app'
@@ -79,6 +79,7 @@ def main():
     if not re.fullmatch(r'\d+\.\d+\.\d+', version):
         raise ValueError('Invalid package version')
     WORK.mkdir(parents=True, exist_ok=True)
+    build_info = write_build_info(WORK)
     runtime = stage_runtime()
     subprocess.run([
         sys.executable, '-m', 'PyInstaller', '--windowed', '--onedir', '--noconfirm', '--noupx',
@@ -86,6 +87,7 @@ def main():
         '--paths', str(ROOT), '--distpath', str(ROOT / 'dist'), '--workpath', str(WORK / 'build'),
         '--specpath', str(WORK), '--add-data', f'{ROOT / "nexus_ui/assets/icons"}:nexus_ui/assets/icons',
         '--add-data', f'{ROOT / "config/model-manifest.json"}:config',
+        '--add-data', f'{build_info}:config',
         '--add-binary', f'{runtime}/*:runtime', str(ROOT / 'scripts/windows_desktop_entry.py'),
     ], cwd=ROOT, check=True)
     resources = APP / 'Contents/Resources'
@@ -93,6 +95,8 @@ def main():
     with (APP / 'Contents/Info.plist').open('rb') as stream:
         info = plistlib.load(stream)
     info.update(CFBundleShortVersionString=version, CFBundleVersion=version, LSMinimumSystemVersion='14.0')
+    explanation = 'Cedexia Nexus zeigt den Namen des verbundenen WLANs an, damit du den passenden Adapter beim Koppeln erkennst.'
+    info.update(NSLocationUsageDescription=explanation, NSLocationWhenInUseUsageDescription=explanation)
     with (APP / 'Contents/Info.plist').open('wb') as stream:
         plistlib.dump(info, stream)
     (resources / 'licenses/Metal-runtime.txt').write_text(f'{RELEASE}{ARCHIVE}\nSHA-256: {SHA256}\nRevision: {REVISION}\n', encoding='utf-8')

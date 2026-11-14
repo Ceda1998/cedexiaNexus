@@ -10,6 +10,7 @@ on:
       - scripts/package_windows.py
       - scripts/windows_desktop_entry.py
       - scripts/verify_model.py
+      - installers/version.txt
       - config/model-manifest.json
       - requirements-ui.txt
 

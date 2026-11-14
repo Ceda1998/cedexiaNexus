@@ -366,8 +366,26 @@ def main(smoke=False):
     from .workspace import Workspace
     window = Workspace()
     if smoke and getattr(sys, 'frozen', False):
+        import json
+        import platform
         import subprocess
+        from .build_info import build_info
+        if platform.system() == 'Windows':
+            from winrt.windows.networking.connectivity import NetworkInformation
+            try:
+                list(NetworkInformation.get_connection_profiles())
+            except OSError:
+                pass  # Some build runners restrict access to network profiles.
+        elif platform.system() == 'Darwin':
+            from CoreLocation import CLLocationManager
+            from CoreWLAN import CWWiFiClient
+            assert CLLocationManager and CWWiFiClient
+        if window.local_mode.text() != 'Einzelgerät' or window.multi_mode.text() != 'Mehrgeräte':
+            raise RuntimeError('The installed workspace is missing the current mode controls.')
+        if window.pairing.connection_type.findText('WLAN') < 0:
+            raise RuntimeError('The installed workspace is missing the WLAN option.')
         subprocess.run([str(window.runner.runtime), '--version'], check=True, timeout=30)
+        print(json.dumps(build_info()), flush=True)
     window.show()
     if smoke:
         QTimer.singleShot(100, app.quit)

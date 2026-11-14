@@ -33,6 +33,14 @@ RUNTIME_FILE = re.compile(
 )
 
 
+def write_build_info(work):
+    version = (ROOT / "installers/version.txt").read_text().strip()
+    sha = subprocess.check_output(["git", "rev-parse", "--short=7", "HEAD"], cwd=ROOT, text=True).strip()
+    info = work / "build-info.json"
+    info.write_text(json.dumps({"version": version, "revision": sha}), encoding="utf-8")
+    return info
+
+
 def download(url, path, sha256=None):
     if not path.exists():
         temporary = path.with_suffix(".part")
@@ -92,7 +100,13 @@ def stage_runtime(runtime):
 def smoke_package(executable=None, work=None):
     exe = str(executable or APP / "CedexiaNexus.exe")
     work = work or WORK
-    subprocess.run([exe, "--smoke-test"], cwd=work, check=True, timeout=60)
+    expected_build = json.loads((work / "build-info.json").read_text(encoding="utf-8"))
+    proof = subprocess.run([exe, "--smoke-test"], cwd=work, timeout=60, capture_output=True)
+    if proof.returncode:
+        raise RuntimeError(f"Packaged app smoke test failed: {proof.stderr.decode(errors='replace').strip()}")
+    lines = proof.stdout.splitlines()
+    if not lines or json.loads(lines[-1]) != expected_build:
+        raise ValueError("The installed app does not identify as the build being packaged.")
     # Exercise the frozen verifier with spaces and Unicode in the model path.
     with TemporaryDirectory(dir=work) as directory:
         model = Path(directory) / "Prüfung lokal.gguf"
@@ -110,11 +124,11 @@ def smoke_package(executable=None, work=None):
             raise ValueError("The packaged model verifier did not verify the test file.")
         model.write_bytes(struct.pack("<4sIQQ", b"GGUF", 3, 1, 1) + bytes(128))
         proof = subprocess.run(
-            [exe, "--verify-local-model", str(model), "--gguf"],
+            [exe, "--verify-local-model", str(model), "--gguf", "--chat-format"],
             cwd=work, check=True, capture_output=True, timeout=30,
         )
-        if json.loads(proof.stdout).get("header_ok") is not True:
-            raise ValueError("The packaged model verifier did not accept a standalone GGUF header.")
+        if json.loads(proof.stdout) != {"header_ok": True, "error": None, "thinking_prefilled": False}:
+            raise ValueError("The installed app's GGUF chat verifier did not return the expected result.")
         data = struct.pack("<4sIQQ", b"GGUF", 3, 1, 0) + bytes(128)
         model.write_bytes(data)
         proof = subprocess.run(
@@ -148,6 +162,12 @@ def stage_notices(destination=None):
             shutil.copyfile(file.locate(), notices / f"PyInstaller-{file.name}")
     packages = {"pyOpenSSL", "cryptography", "cffi", "pycparser", "mcp"}
     pending = ["mcp"]
+    if platform.system() == 'Windows':
+        pending.extend(("winrt-Windows.Networking.Connectivity", "winrt-Windows.Foundation",
+                        "winrt-Windows.Foundation.Collections"))
+    elif platform.system() == 'Darwin':
+        pending.extend(("pyobjc-framework-CoreWLAN", "pyobjc-framework-CoreLocation"))
+    packages.update(pending)
     while pending:
         for requirement in distribution(pending.pop()).requires or ():
             parsed = Requirement(requirement)
@@ -183,12 +203,14 @@ def main():
     if manifest["runtime"]["candidate_revision"] != REVISION:
         raise SystemExit("Update the Windows release pins to match the model manifest.")
     WORK.mkdir(parents=True, exist_ok=True)
+    info = write_build_info(WORK)
     subprocess.run([
         sys.executable, "-m", "PyInstaller", "--onedir", "--console", "--hide-console", "hide-early",
         "--noupx", "--noconfirm", "--name", "CedexiaNexus", "--paths", str(ROOT),
         "--distpath", str(APP.parent), "--workpath", str(WORK / "build"), "--specpath", str(WORK),
         "--add-data", f"{ROOT / 'nexus_ui/assets/icons'}:nexus_ui/assets/icons",
         "--add-data", f"{ROOT / 'config/model-manifest.json'}:config",
+        "--add-data", f"{info}:config",
         str(ROOT / "scripts/windows_desktop_entry.py"),
     ], cwd=ROOT, check=True)
     stage_runtime(APP / "_internal/runtime")
