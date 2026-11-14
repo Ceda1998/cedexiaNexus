@@ -7,6 +7,12 @@ Beide Hosts müssen an derselben Modellberechnung beteiligt sein.
 
 ## Status
 
+**Installation ohne Entwicklungsumgebung:** Geführte Installer für macOS
+(Apple Silicon) und Windows x64 stehen unter
+[GitHub Releases](https://github.com/Ceda1998/cedexiaNexus/releases) bereit.
+Sie enthalten App und Laufzeiten, aber keine GGUF-Modelle.
+[Installationsanleitung, Voraussetzungen und Deinstallation](docs/installation.md).
+
 Die Desktop-App startet mit Projekten und Chats, einklappbarer Sidebar,
 Moduswahl und separaten Einstellungen. Der lokale Composer verwendet die
 vorhandene Runtime. [Bedienung und Funktionsstand](docs/desktop.md#projekt--und-chatoberfläche).

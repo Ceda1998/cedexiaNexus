@@ -1,4 +1,4 @@
-"""Entry point for the bundled Windows application and its verifier subprocess."""
+"""Entry point for bundled desktop apps and their verifier subprocess."""
 
 import sys
 

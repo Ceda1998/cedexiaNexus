@@ -1,5 +1,8 @@
 # Desktop-App · Lokale Modelle und LAN-Verbindung
 
+Geführte Installer für Mac und Windows installieren App und Laufzeiten ohne
+Modellgewichte. [Download, Installation und Updates](installation.md).
+
 ## Projekt- und Chatoberfläche
 
 NX-054 und NX-055 öffnen die App mit einer einklappbaren Sidebar, Projekten und

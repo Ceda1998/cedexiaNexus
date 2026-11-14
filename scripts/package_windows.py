@@ -8,6 +8,7 @@ from packaging.requirements import Requirement
 import platform
 import re
 import shutil
+import ssl
 import struct
 import subprocess
 import sys
@@ -36,7 +37,8 @@ def download(url, path, sha256=None):
     if not path.exists():
         temporary = path.with_suffix(".part")
         try:
-            with urlopen(url, timeout=90) as source, temporary.open("wb") as target:
+            ca_file = '/etc/ssl/cert.pem' if platform.system() == 'Darwin' else None
+            with urlopen(url, timeout=90, context=ssl.create_default_context(cafile=ca_file)) as source, temporary.open("wb") as target:
                 shutil.copyfileobj(source, target)
             temporary.replace(path)
         finally:
@@ -68,6 +70,15 @@ def stage_runtime(runtime):
     for prefix in ("ggml-cpu", "cudart64_", "cublas64_", "cublasLt64_"):
         if not list(runtime.glob(f"{prefix}*.dll")):
             raise ValueError(f"The release is missing {prefix} libraries.")
+    # Keep MSVC dependencies next to llama.cpp too; never rely on developer tools
+    # or a system-wide redistributable being installed on the destination PC.
+    for name in ('msvcp140.dll', 'vcruntime140.dll', 'vcruntime140_1.dll'):
+        candidates = [runtime.parent / name, Path(sys.base_prefix) / name]
+        candidates.extend(file.locate() for file in distribution('PySide6_Essentials').files or () if file.name.lower() == name)
+        source = next((path for path in candidates if path.is_file()), None)
+        if source is None:
+            raise ValueError(f'Missing app-local Microsoft runtime: {name}')
+        shutil.copyfile(source, runtime / name)
     launcher = runtime / "llama-completion.exe"
     version = subprocess.run(
         [str(launcher), "--version"], cwd=runtime, capture_output=True, text=True, check=True, timeout=30,
@@ -78,11 +89,12 @@ def stage_runtime(runtime):
     subprocess.run([str(launcher), "--offline", "--list-devices"], cwd=runtime, check=True, timeout=30)
 
 
-def smoke_package():
-    exe = str(APP / "CedexiaNexus.exe")
-    subprocess.run([exe, "--smoke-test"], cwd=WORK, check=True, timeout=30)
+def smoke_package(executable=None, work=None):
+    exe = str(executable or APP / "CedexiaNexus.exe")
+    work = work or WORK
+    subprocess.run([exe, "--smoke-test"], cwd=work, check=True, timeout=60)
     # Exercise the frozen verifier with spaces and Unicode in the model path.
-    with TemporaryDirectory(dir=WORK) as directory:
+    with TemporaryDirectory(dir=work) as directory:
         model = Path(directory) / "Prüfung lokal.gguf"
         data = b"NX-052 verifier test data"
         model.write_bytes(data)
@@ -92,14 +104,14 @@ def smoke_package():
         }), encoding="utf-8")
         proof = subprocess.run(
             [exe, "--verify-local-model", str(model), "--manifest", str(manifest)],
-            cwd=WORK, check=True, capture_output=True, timeout=30,
+            cwd=work, check=True, capture_output=True, timeout=30,
         )
         if json.loads(proof.stdout).get("verified") is not True:
             raise ValueError("The packaged model verifier did not verify the test file.")
         model.write_bytes(struct.pack("<4sIQQ", b"GGUF", 3, 1, 1) + bytes(128))
         proof = subprocess.run(
             [exe, "--verify-local-model", str(model), "--gguf"],
-            cwd=WORK, check=True, capture_output=True, timeout=30,
+            cwd=work, check=True, capture_output=True, timeout=30,
         )
         if json.loads(proof.stdout).get("header_ok") is not True:
             raise ValueError("The packaged model verifier did not accept a standalone GGUF header.")
@@ -107,18 +119,23 @@ def smoke_package():
         model.write_bytes(data)
         proof = subprocess.run(
             [exe, "--verify-local-model", str(model), "--fingerprint-gguf"],
-            cwd=WORK, check=True, capture_output=True, timeout=30,
+            cwd=work, check=True, capture_output=True, timeout=30,
         )
         expected = {"sha256": hashlib.sha256(data).hexdigest(), "size": len(data), "parts": 1}
         if json.loads(proof.stdout) != expected:
             raise ValueError("The packaged verifier did not fingerprint the GGUF.")
 
 
-def stage_notices():
-    notices = APP / "licenses"
+def stage_notices(destination=None):
+    destination = destination or APP
+    notices = destination / "licenses"
     notices.mkdir()
     shutil.copyfile(ROOT / "nexus_ui/assets/icons/LICENSE", notices / "Tabler-MIT.txt")
-    shutil.copyfile(Path(sys.base_prefix) / "LICENSE.txt", notices / "Python.txt")
+    python_license = Path(sys.base_prefix) / "LICENSE.txt"
+    if not python_license.exists():
+        import sysconfig
+        python_license = Path(sysconfig.get_path('stdlib')) / 'LICENSE.txt'
+    shutil.copyfile(python_license, notices / "Python.txt")
     for name in ("LGPL-3.0-only.txt", "GPL-3.0-only.txt"):
         download("https://raw.githubusercontent.com/qt/qtbase/v6.8.3/LICENSES/" + name, notices / name)
     download(
@@ -143,18 +160,18 @@ def stage_notices():
         for file in distribution(package).files or ():
             if any(part.endswith('.dist-info') for part in file.parts) and file.name.upper().startswith(("LICENSE", "COPYING", "NOTICE")):
                 shutil.copyfile(file.locate(), notices / f"{package}-{file.name}.txt")
-    shutil.copyfile(ROOT / "docs/windows-app.md", APP / "START.md")
+    shutil.copyfile(ROOT / "docs/installation.md", destination / "START.md")
     (notices / "Sources.txt").write_text(
         "Qt 6.8.3, PySide6 and Shiboken6 6.8.3 (LGPLv3), unmodified shared libraries.\n"
         "Qt source: https://download.qt.io/archive/qt/6.8/6.8.3/single/\n"
         "Qt for Python source: https://download.qt.io/official_releases/QtForPython/pyside6/\n"
-        "The LGPL libraries in _internal may be replaced with compatible versions.\n"
+        "The shared LGPL libraries may be replaced with compatible versions.\n"
         "LAN TLS libraries: https://pypi.org/project/pyOpenSSL/ and https://pypi.org/project/cryptography/\n"
         "MCP Python SDK: https://github.com/modelcontextprotocol/python-sdk (MIT)\n"
         f"llama.cpp (MIT): https://github.com/ggml-org/llama.cpp/tree/{REVISION}\n"
-        "NVIDIA CUDA 13.5 runtime and cuBLAS: https://docs.nvidia.com/cuda/eula/index.html\n"
+        + ("NVIDIA CUDA 13.5 runtime and cuBLAS: https://docs.nvidia.com/cuda/eula/index.html\n"
         "CUDA archives and SHA-256:\n"
-        + "".join(f"{RELEASE}{name}  {digest}\n" for name, digest in ARCHIVES.items()),
+        + "".join(f"{RELEASE}{name}  {digest}\n" for name, digest in ARCHIVES.items()) if platform.system() == 'Windows' else ''),
         encoding="utf-8",
     )
 

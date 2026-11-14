@@ -46,7 +46,8 @@ class LocalRunner(QObject):
             self.runtime = runtime_dir / "llama-completion.exe"
             model_dir = Path(sys.executable).parent if self.frozen else self.root
         else:
-            self.runtime = self.root / "local/build/llama-metal/bin/llama-completion"
+            runtime_dir = self.root / "runtime" if self.frozen else self.root / "local/build/llama-metal/bin"
+            self.runtime = runtime_dir / "llama-completion"
             model_dir = self.root
         self.models = list(dict.fromkeys(self.settings.value("local_model_paths", [], type=list)))
         saved_model = self.settings.value("local_model_path", "", type=str)
@@ -79,7 +80,7 @@ class LocalRunner(QObject):
         if not self.runtime.is_file() or not os.access(self.runtime, os.X_OK):
             if self.windows:
                 return "CUDA-Runtime fehlt. Entpacke das vollständige Windows-Paket."
-            return "Lokale Runtime fehlt. Zuerst den Metal-Build aus NX-005 einrichten."
+            return "Lokale Runtime fehlt. Installiere die App erneut oder richte den Metal-Build aus NX-005 ein."
         if self.model is None:
             return "Füge eine lokale GGUF-Datei hinzu."
         if not self.model.is_file():

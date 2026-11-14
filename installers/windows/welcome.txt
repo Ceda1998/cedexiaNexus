@@ -1,0 +1,11 @@
+﻿Willkommen bei Cedexia Nexus
+
+Dieser Assistent installiert die Desktop-App für dein Benutzerkonto. Wähle den Zielordner und optional eine Desktop-Verknüpfung.
+
+Enthalten: Python, Qt, MCP-Client und llama.cpp mit CUDA-Laufzeitbibliotheken. Du brauchst keine separate Python-Installation, keinen Compiler und kein CUDA-Toolkit. Während der Installation sind keine Downloads nötig.
+
+Voraussetzungen: Windows 10/11 x64. Für lokale GPU-Inferenz brauchst du einen CUDA-13.5-kompatiblen NVIDIA-Grafiktreiber. Falls er fehlt, installiere den passenden Treiber von https://www.nvidia.com/drivers/ und starte Windows anschließend neu. Der Installer verändert keine Treiber oder Firewall-Regeln.
+
+GGUF-Modelle sind nicht enthalten und werden nicht heruntergeladen. Auch Programme externer MCP-Server musst du bei Bedarf separat einrichten.
+
+Dies ist ein unsignierter Testbuild. Die Anwendung befindet sich in Entwicklung. Bestehende Chats, Einstellungen und Modelldateien werden nicht gelöscht. Schließe Cedexia Nexus vor einem Update.
