@@ -116,17 +116,19 @@ Modellgewichte und belegen keine Modellqualität oder verteilte Inferenz.
 
 ## Geräte im LAN verbinden
 
-1. Auf beiden Geräten Cedexia Nexus mit NX-053 öffnen. Auf dem Mac einmalig
-   `.venv/bin/python -m pip install -r requirements-ui.txt` ausführen und
-   die App wie gewohnt starten. Auf Windows gehört die TLS-Bibliothek zum
-   vollständigen [EXE-Paket](windows-app.md).
-2. Auf dem Mac **Geräte verbinden** öffnen, die LAN-Schnittstelle auswählen,
-   **Einladung erstellen** klicken und den Code kopieren. Den Code vertraulich
-   an das beitretende Gerät weitergeben. Er gilt fünf Minuten und für einen
-   Beitritt. Windows kann die Einladung ebenfalls erstellen.
-3. Auf dem zweiten Gerät unter **Geräte verbinden** den Code einfügen und
-   **Beitreten** klicken. Bei einer Betriebssystemabfrage nur den lokalen
-   Netzwerkzugriff bzw. das private Netzwerk zulassen.
+1. Auf beiden Geräten die aktuelle Version von Cedexia Nexus starten.
+   Beide Geräte ins gleiche lokale Netz bringen. Dabei kann ein Gerät per
+   Ethernet und das andere per WLAN verbunden sein, wenn sie sich erreichen.
+2. Auf beiden Geräten **Mehrgeräte → Geräte verbinden …** öffnen. Bei
+   **Verbindung** auf jedem Gerät separat **Ethernet (LAN)** oder **WLAN**
+   wählen. Unter **Adapter** die passende lokale IPv4-Adresse wählen.
+   Nach einem Netzwechsel **Aktualisieren** klicken. Falls das Betriebssystem
+   den Adaptertyp nicht eindeutig meldet, zeigt **Manuelle Auswahl** alle
+   aktiven Adapter mit privater IPv4-Adresse.
+3. Auf einem Gerät **Einladung erstellen** wählen und den Code vertraulich
+   weitergeben. Er gilt fünf Minuten und für einen Beitritt. Auf dem zweiten
+   Gerät den Code einfügen und **Beitreten** klicken. Bei einer Systemabfrage
+   den Zugriff auf das lokale beziehungsweise private Netzwerk erlauben.
 4. Die App prüft die in **Lokales Modell** ausgewählten Dateien im Hintergrund.
    Bei Split-GGUFs den ersten Teil auswählen und alle Teile im selben Ordner
    belassen. Die Prüfung liest jede Datei vollständig. Je nach Größe und
@@ -138,15 +140,16 @@ Modellgewichte und belegen keine Modellqualität oder verteilte Inferenz.
    Das zweite Gerät öffnet den Link auf Klick im Browser, lädt die Gewichte
    dort und wählt sie in der App aus. **Gewichte erneut prüfen** erkennt eine
    am selben Pfad ersetzte Datei.
-6. **Trennen** oder das Fenster schließen. Die Sitzung endet auch nach
+6. Im Gerätefenster **Trennen** wählen oder die App beenden. Die Sitzung endet auch nach
    zwei Stunden.
 
 Der Abgleich vergleicht SHA-256, Größe und Anzahl der Dateien. Unterschiedliche
 Namen sind bei identischem Inhalt möglich. Der Status beschreibt die geprüften
 Dateien zum Zeitpunkt des Abgleichs. Die Geräteansicht startet keinen
 Inferenzauftrag. Gemeinsame Modellberechnung wird separat in NX-011 geprüft.
-Die Verbindung verwendet IPv4 im selben privaten LAN. VPNs, isolierte
-Gastnetze und Host-Firewalls können den Zugriff verhindern.
+Die Verbindung nutzt die gewählte private IPv4-Adresse auf beiden Geräten.
+Gast-WLANs mit Client-Isolation, getrennte Netzsegmente und Host-Firewalls
+können die Verbindung blockieren.
 
 ## Lokales Modell in der UI testen
 

@@ -13,6 +13,7 @@ from unittest.mock import patch
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 try:
     from PySide6.QtCore import QSettings
+    from PySide6.QtNetwork import QNetworkInterface
     from nexus_ui.app import NexusWindow, make_application
     from nexus_ui.device_pairing import pinned_source
     from nexus_ui.local_model import LocalRunner
@@ -82,12 +83,16 @@ class DevicePairingTests(unittest.TestCase):
         addresses = patch("nexus_ui.pairing_transport.LAN_NETWORKS", (ipaddress.ip_network("127.0.0.0/8"),))
         addresses.start()
         self.addCleanup(addresses.stop)
+        wifi = {"127.0.0.1": ("WLAN-Testadapter", QNetworkInterface.InterfaceType.Wifi)}
+        adapters = patch("nexus_ui.device_pairing.lan_interfaces", return_value=wifi)
+        adapters.start()
+        self.addCleanup(adapters.stop)
         host_window = self.window(root, "host")
         peer_window = self.window(root, "peer")
         host, peer = host_window.pairing, peer_window.pairing
         host.runner.select_model(mac_model)
-        host.interfaces.clear()
-        host.interfaces.addItem("Test", "127.0.0.1")
+        self.assertEqual(host.connection_type.currentText(), "WLAN")
+        self.assertEqual(peer.connection_type.currentText(), "WLAN")
         self.assertTrue(host.host.isEnabled())
         host.host.click()
         self.wait_for(lambda: bool(host.code.text()) or host.thread is None)
@@ -103,6 +108,7 @@ class DevicePairingTests(unittest.TestCase):
             self.assertIn("fehlgeschlagen", peer.status.text())
         peer.code.setText(code)
         peer.join.click()
+        self.assertEqual(peer.thread.source_address, "127.0.0.1")
         self.wait_for(lambda: host.local_model["state"] in ("ready", "error") and peer.connected)
         self.assertEqual(host.local_model["state"], "ready", host.selected.text())
         self.wait_for(lambda: host.share.isVisible())
@@ -128,3 +134,31 @@ class DevicePairingTests(unittest.TestCase):
         host_window.close()
         self.wait_for(lambda: host.thread is None and peer.thread is None and not host_window.isVisible())
         self.assertFalse(peer.connected)
+
+    def test_connection_type_filters_addresses_and_gates_join(self):
+        root = Path(self.enterContext(tempfile.TemporaryDirectory()))
+        interface = QNetworkInterface.InterfaceType
+        ethernet, wifi, unknown = "192.0.2.10", "192.0.2.20", "192.0.2.30"
+        detected = {
+            ethernet: ("Kabel", interface.Ethernet),
+            wifi: ("Funk", interface.Wifi),
+            unknown: ("Sonstiger Adapter", interface.Unknown),
+        }
+        with patch("nexus_ui.device_pairing.lan_interfaces", return_value=detected):
+            page = self.window(root, "network-options").pairing
+            self.assertEqual(page.connection_type.currentText(), "Ethernet (LAN)")
+            self.assertEqual(page.interfaces.currentData(), ethernet)
+            page.connection_type.setCurrentText("WLAN")
+            self.assertEqual(page.interfaces.currentData(), wifi)
+            self.assertEqual(page.interfaces.count(), 1)
+            page.connection_type.setCurrentText("Manuelle Auswahl")
+            self.assertEqual(page.interfaces.count(), 3)
+            page.interfaces.setCurrentIndex(page.interfaces.findData(unknown))
+            self.assertEqual(page.interfaces.currentData(), unknown)
+
+            detected.pop(wifi)
+            page.connection_type.setCurrentText("WLAN")
+            page.code.setText("Einladung")
+            self.assertFalse(page.join.isEnabled())
+            self.assertFalse(page.host.isEnabled())
+            self.assertIn("Manuelle Auswahl", page.network_hint.text())

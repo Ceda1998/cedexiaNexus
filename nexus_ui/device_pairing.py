@@ -15,6 +15,11 @@ from PySide6.QtWidgets import (
 from .pairing_transport import PairingThread, lan_address, valid_source
 
 MISSING_MODEL = {"type": "model", "state": "missing"}
+CONNECTION_TYPES = (
+    (QNetworkInterface.InterfaceType.Ethernet, "Ethernet (LAN)"),
+    (QNetworkInterface.InterfaceType.Wifi, "WLAN"),
+    (None, "Manuelle Auswahl"),
+)
 
 
 def lan_interfaces():
@@ -28,7 +33,7 @@ def lan_interfaces():
                 lan_address(address)
             except ValueError:
                 continue
-            addresses[address] = interface.humanReadableName()
+            addresses[address] = (interface.humanReadableName(), interface.type())
     return addresses
 
 
@@ -97,20 +102,34 @@ class DevicePairingPage(QWidget):
 
         layout = QVBoxLayout(self)
         layout.addWidget(plain_label("Geräte verbinden", "title"))
-        layout.addWidget(plain_label("Auf beiden Geräten Cedexia Nexus öffnen. Beide müssen im selben LAN sein."))
+        layout.addWidget(plain_label(
+            "Verbinde beide Geräte mit demselben lokalen Netz über Ethernet oder WLAN. "
+            "Wähle auf jedem Gerät seine Netzwerkverbindung."
+        ))
         self.status = plain_label("Eine Einladung erstellen oder eine erhaltene Einladung einfügen.", "banner")
         layout.addWidget(self.status)
 
         form = QFormLayout()
+        self.connection_type = QComboBox()
+        self.connection_type.setAccessibleName("Netzwerkverbindung")
+        for _, label in CONNECTION_TYPES:
+            self.connection_type.addItem(label)
+        self.connection_type.setCurrentIndex(-1)
+        form.addRow("Verbindung", self.connection_type)
         self.interfaces = QComboBox()
-        self.interfaces.setAccessibleName("Lokale LAN-Adresse")
-        self.reload_interfaces()
+        self.interfaces.setAccessibleName("Lokale Netzwerkadresse")
+        self.interfaces.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon)
+        self.interfaces.setMinimumContentsLength(14)
+        self.network_hint = plain_label("")
         self.host = action("Einladung erstellen", self.start_host)
-        self.reload = action("Adressen aktualisieren", self.reload_interfaces)
+        self.reload = action("Aktualisieren", self.reload_interfaces)
+        self.reload.setToolTip("Netzwerkadapter neu einlesen")
         host_row = QHBoxLayout()
-        for widget in (self.interfaces, self.reload, self.host):
-            host_row.addWidget(widget)
-        form.addRow("LAN-Adresse", host_row)
+        host_row.addWidget(self.interfaces, 1)
+        host_row.addWidget(self.reload)
+        form.addRow("Adapter", host_row)
+        form.addRow(self.network_hint)
+        form.addRow(self.host)
         self.code = QLineEdit()
         self.code.setMaxLength(128)
         self.code.setAccessibleName("Einladungscode")
@@ -150,31 +169,52 @@ class DevicePairingPage(QWidget):
             layout.addWidget(widget)
         layout.addStretch()
         self.interfaces.currentIndexChanged.connect(self.refresh)
+        self.connection_type.currentIndexChanged.connect(self.reload_interfaces)
         self.code.textChanged.connect(self.refresh)
         self.source.textChanged.connect(self.source_changed)
         self.runner.model_changed.connect(self.selection_changed)
-        self.refresh()
+        self.reload_interfaces()
 
     def reload_interfaces(self):
         previous = self.interfaces.currentData()
+        adapters = lan_interfaces()
+        if self.connection_type.currentIndex() < 0:
+            known = [kind for _, kind in adapters.values()]
+            first = next((index for index, (kind, _) in enumerate(CONNECTION_TYPES[:-1])
+                          if kind in known), len(CONNECTION_TYPES) - 1)
+            self.connection_type.blockSignals(True)
+            self.connection_type.setCurrentIndex(first)
+            self.connection_type.blockSignals(False)
+        kind, label = CONNECTION_TYPES[self.connection_type.currentIndex()]
+        self.interfaces.blockSignals(True)
         self.interfaces.clear()
-        for address, name in lan_interfaces().items():
-            self.interfaces.addItem(f"{name} · {address}", address)
+        for address, (name, detected) in adapters.items():
+            if kind is None or kind == detected:
+                self.interfaces.addItem(f"{name} · {address}", address)
         if previous and (index := self.interfaces.findData(previous)) >= 0:
             self.interfaces.setCurrentIndex(index)
-        if hasattr(self, "host"):
-            self.refresh()
+        self.interfaces.blockSignals(False)
+        if self.interfaces.count() == 0:
+            self.network_hint.setText(f"Keine aktive IPv4-Adresse für {label}. Netzwerk prüfen und aktualisieren.")
+        elif kind is None:
+            self.network_hint.setText("Wähle den Adapter, der mit dem Netz des anderen Geräts verbunden ist.")
+        else:
+            self.network_hint.clear()
+        if kind is not None and self.interfaces.count() == 0 and adapters:
+            self.network_hint.setText(f"Kein Adapter für {label} erkannt. Wähle bei Bedarf „Manuelle Auswahl“.")
+        self.network_hint.setVisible(bool(self.network_hint.text()))
+        self.refresh()
 
     def start_host(self):
         if self.thread is None and (address := self.interfaces.currentData()):
             self.begin(PairingThread(address=address, parent=self), hosting=True)
 
     def start_join(self):
-        if self.thread is not None:
+        if self.thread is not None or not (address := self.interfaces.currentData()):
             return
         code = self.code.text().strip()
         try:
-            thread = PairingThread(code=code, parent=self)
+            thread = PairingThread(code=code, source_address=address, parent=self)
         except ValueError:
             self.status.setText("Der Einladungscode ist ungültig. Kopiere ihn erneut auf dem anderen Gerät.")
             return
@@ -217,7 +257,8 @@ class DevicePairingPage(QWidget):
             return
         self.connected = True
         self.clear_invitation()
-        self.status.setText("Geräte verbunden · verschlüsselte LAN-Sitzung")
+        label = self.connection_type.currentText()
+        self.status.setText(f"Geräte verbunden · {label} · verschlüsselt")
         self.check_model()
 
     def close_session(self):
@@ -344,11 +385,13 @@ class DevicePairingPage(QWidget):
 
     def refresh(self):
         active = self.thread is not None
+        has_address = bool(self.interfaces.currentData())
+        self.connection_type.setEnabled(not active)
         self.interfaces.setEnabled(not active)
         self.reload.setEnabled(not active)
-        self.host.setEnabled(not active and self.interfaces.count() > 0)
+        self.host.setEnabled(not active and has_address)
         self.code.setReadOnly(active)
-        self.join.setEnabled(not active and bool(self.code.text().strip()))
+        self.join.setEnabled(not active and has_address and bool(self.code.text().strip()))
         self.copy.setVisible(active and self.hosting and not self.connected)
         self.copy.setEnabled(active and bool(self.code.text()))
         self.disconnect.setEnabled(active)

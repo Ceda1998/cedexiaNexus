@@ -167,11 +167,12 @@ class PairingThread(QThread):
     message = Signal(dict)
     ended = Signal(str)
 
-    def __init__(self, *, address=None, code=None, parent=None):
+    def __init__(self, *, address=None, code=None, source_address=None, parent=None):
         super().__init__(parent)
         if (address is None) == (code is None):
             raise ValueError("Select a local address or provide an invitation.")
         self.address = address
+        self.source_address = str(lan_address(source_address)) if source_address else None
         self.target = read_invitation(code) if code is not None else None
         self.cancelled = Event()
         self.outgoing = Queue()
@@ -194,9 +195,10 @@ class PairingThread(QThread):
             if self.joined:
                 status = "Verbindung zum anderen Gerät beendet."
             elif self.target is None:
-                status = "Einladung beendet. Prüfe bei Bedarf die LAN-Adresse und die Firewall."
+                status = "Einladung beendet. Prüfe die ausgewählte Netzwerkadresse und die Firewall."
             else:
-                status = "Beitritt fehlgeschlagen. Prüfe Einladung, gemeinsames LAN und Firewall."
+                status = ("Beitritt fehlgeschlagen. Prüfe den Adapter, die Einladung und die Firewall. "
+                          "Beide Geräte müssen sich im selben lokalen Netz erreichen können.")
         else:
             status = "Einladung oder Sitzung abgelaufen."
         if self.cancelled.is_set():
@@ -240,7 +242,8 @@ class PairingThread(QThread):
 
     def join(self):
         address, port, fingerprint, secret = self.target
-        with socket.create_connection((address, port), timeout=3) as raw:
+        source = (self.source_address, 0) if self.source_address else None
+        with socket.create_connection((address, port), timeout=3, source_address=source) as raw:
             channel = Channel(tls_context(server=False), raw, False, self.cancelled)
             deadline = time.monotonic() + HANDSHAKE_SECONDS
             channel.call(channel.tls.do_handshake, deadline)
