@@ -9,7 +9,7 @@ from PySide6.QtCore import QSize, Qt, QStandardPaths, QTimer
 from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QPushButton, QLabel, QComboBox, QTreeWidget, QTreeWidgetItem, QPlainTextEdit,
-    QDialog, QListWidget, QStackedWidget, QFormLayout, QSpinBox, QCheckBox,
+    QDialog, QListWidget, QStackedWidget, QFormLayout, QSpinBox, QCheckBox, QButtonGroup,
     QInputDialog, QMessageBox, QFileDialog, QMenu, QScrollArea)
 
 from .local_model import LocalRunner
@@ -79,11 +79,26 @@ class Workspace(QMainWindow):
         brand = QLabel('Cedexia Nexus')
         brand.setObjectName('workspaceBrand')
         side.addWidget(brand)
-        self.mode = QComboBox()
-        self.mode.addItems(['Lokal · Einzelmodell', 'Verbundene Geräte'])
+        self.mode = QWidget()
         self.mode.setAccessibleName('Ausführungsmodus')
+        modes = QHBoxLayout(self.mode)
+        modes.setContentsMargins(0, 0, 0, 0)
+        modes.setSpacing(4)
+        self.mode_buttons = QButtonGroup(self.mode)
+        self.local_mode = QPushButton('Einzelgerät')
+        self.multi_mode = QPushButton('Mehrgeräte')
+        for index, (button, hint) in enumerate((
+            (self.local_mode, 'Modell lokal auf diesem Gerät ausführen'),
+            (self.multi_mode, 'Ein zweites Gerät koppeln und Modelle abgleichen'),
+        )):
+            button.setCheckable(True)
+            button.setProperty('modeChoice', True)
+            button.setToolTip(hint)
+            self.mode_buttons.addButton(button, index)
+            modes.addWidget(button, 1)
+        self.local_mode.setChecked(True)
         side.addWidget(self.mode)
-        self.add_device = self.button('+ Gerät hinzufügen', self.open_devices, side)
+        self.add_device = self.button('Geräte verbinden …', self.open_devices, side)
         commands = QHBoxLayout()
         self.new_project = self.button('+ Projekt', self.create_project, commands)
         self.new_chat = self.button('+ Chat', self.create_chat, commands)
@@ -167,7 +182,7 @@ class Workspace(QMainWindow):
         composer_row.addStretch()
         main.addLayout(composer_row)
         self.devices = QDialog(self)
-        self.devices.setWindowTitle('Gerät hinzufügen · Cedexia Nexus')
+        self.devices.setWindowTitle('Geräte verbinden · Cedexia Nexus')
         self.devices.resize(820, 760)
         device_layout = QVBoxLayout(self.devices)
         self.pairing = DevicePairingPage(self.runner)
@@ -190,7 +205,7 @@ class Workspace(QMainWindow):
         self.runner.model_changed.connect(self.refresh_models)
         self.models.currentIndexChanged.connect(self.choose_model)
         self.tree.currentItemChanged.connect(self.select_chat)
-        self.mode.currentIndexChanged.connect(self.change_mode)
+        self.mode_buttons.idClicked.connect(self.change_mode)
         self.prompt.textChanged.connect(self.refresh)
         self.refresh_tree()
         self.refresh_models()
@@ -259,7 +274,7 @@ class Workspace(QMainWindow):
             if message.pop('pending', False):
                 message['status'] = 'Der vorherige Lauf wurde unterbrochen.'
         self.transcript.clear()
-        self.status.setText('Lokal · Bereit' if self.mode.currentIndex() == 0 else 'Gerätemodus')
+        self.status.setText('Lokal · Bereit' if self.local_mode.isChecked() else self.device_mode_status())
         self.pending_context = ''
         self.prompt.clear()
         self.refresh_tree()
@@ -305,11 +320,18 @@ class Workspace(QMainWindow):
         self.refresh_models()
 
     def change_mode(self):
-        self.add_device.setVisible(self.mode.currentIndex() == 1)
-        self.status.setText('Lokal · Bereit' if self.mode.currentIndex() == 0 else 'Gerätemodus · Verbindung und Modellabgleich verfügbar. Gemeinsame Inferenz folgt mit NX-011.')
+        self.add_device.setVisible(self.multi_mode.isChecked())
+        self.status.setText('Lokal · Bereit' if self.local_mode.isChecked() else self.device_mode_status())
         self.refresh()
 
+    def device_mode_status(self):
+        if self.pairing.connected:
+            return 'Geräte verbunden · Modellabgleich im Gerätefenster'
+        return 'Gerätemodus · Verbinde ein Gerät, um die Modelle abzugleichen.'
+
     def open_devices(self):
+        if not self.pairing.busy:
+            self.pairing.reload_interfaces()
         self.devices.show()
         self.devices.raise_()
 
@@ -317,13 +339,14 @@ class Workspace(QMainWindow):
         connected = self.pairing.connected
         if connected and not self.was_connected:
             self.devices.hide()
-            self.status.setText('Geräte verbunden · Modellabgleich in den Geräteeinstellungen. Gemeinsame Inferenz folgt mit NX-011.')
-        if self.was_connected and not connected:
+            if self.multi_mode.isChecked():
+                self.status.setText(self.device_mode_status())
+        if self.was_connected and not connected and self.multi_mode.isChecked():
             self.status.setText('Geräteverbindung beendet.')
         self.was_connected = connected
 
     def submit(self):
-        if self.runner.busy or self.mode.currentIndex() == 1:
+        if self.runner.busy or not self.local_mode.isChecked():
             return
         text = self.prompt.toPlainText().strip()
         if not text:
@@ -397,7 +420,10 @@ class Workspace(QMainWindow):
         for widget in (self.tree, self.new_project, self.new_chat, self.delete_chat, self.models, self.skill_button, self.mcp_button, self.mode):
             widget.setEnabled(not busy)
         self.prompt.setReadOnly(busy)
-        self.send.setEnabled(not busy and self.mode.currentIndex() == 0 and bool(self.prompt.toPlainText().strip()) and not self.runner.unavailable_reason())
+        can_send = (not busy and self.local_mode.isChecked()
+                    and bool(self.prompt.toPlainText().strip()) and not self.runner.unavailable_reason())
+        self.send.setEnabled(can_send)
+        self.send.setToolTip('' if self.local_mode.isChecked() else 'Zum Chatten Einzelgerät wählen.')
         self.stop.setVisible(busy)
         self.send.setVisible(not busy)
 

@@ -98,7 +98,7 @@ class WorkspaceTests(unittest.TestCase):
             self.assertIn('Hallo Welt', window.messages[-1]['text'])
             self.assertIn('Nutze das Wort Nexus.', window.messages[-1]['text'])
             window.open_settings()
-            window.mode.setCurrentIndex(1)
+            window.multi_mode.click()
             window.prompt.setPlainText('Test')
             self.assertFalse(window.send.isEnabled())
             window.close()

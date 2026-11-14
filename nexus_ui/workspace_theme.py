@@ -6,6 +6,7 @@ LIGHT = {
     'hover': '#E4EBF5', 'selection': '#DCE8F8', 'selected_text': '#173B70',
     'focus': '#326BC0', 'accent': '#173B70', 'accent_hover': '#24558D',
     'disabled': '#748299', 'danger': '#A1283D',
+    'scroll_track': '#E5EBF3', 'scroll_thumb': '#7C8EA6', 'scroll_hover': '#596E89',
 }
 
 DARK = {
@@ -14,6 +15,7 @@ DARK = {
     'hover': '#2A384A', 'selection': '#294364', 'selected_text': '#E9F2FF',
     'focus': '#8AB7F7', 'accent': '#376EAD', 'accent_hover': '#436FAB',
     'disabled': '#8695AA', 'danger': '#FDA4AE',
+    'scroll_track': '#283445', 'scroll_thumb': '#8C9EB6', 'scroll_hover': '#B0C0D4',
 }
 
 
@@ -44,6 +46,15 @@ def workspace_style(c):
         QListWidget#skillList {{ background: {c['surface']}; border: 1px solid {c['line']}; border-radius: 7px; }}
         QTreeWidget:focus, QListWidget:focus {{ border: 1px solid {c['focus']}; padding: 1px; }}
         QScrollArea, QTextBrowser {{ border: 0; padding: 0; }}
+        QScrollBar {{ background: {c['scroll_track']}; border: 0; border-radius: 5px; margin: 0; }}
+        QScrollBar:vertical {{ width: 12px; }}
+        QScrollBar:horizontal {{ height: 12px; }}
+        QScrollBar::handle {{ background: {c['scroll_thumb']}; border-radius: 5px; }}
+        QScrollBar::handle:vertical {{ min-height: 28px; }}
+        QScrollBar::handle:horizontal {{ min-width: 28px; }}
+        QScrollBar::handle:hover, QScrollBar::handle:pressed {{ background: {c['scroll_hover']}; }}
+        QScrollBar::add-line, QScrollBar::sub-line {{ width: 0; height: 0; border: 0; }}
+        QScrollBar::add-page, QScrollBar::sub-page {{ background: transparent; }}
         QWidget#chatMessage[role="user"], QWidget#chatMessage[role="user"] QTextBrowser,
         QTextBrowser#thinkingText {{ background: {c['surface']}; }}
         QWidget#chatMessage[role="user"] {{ border: 1px solid {c['line']}; border-radius: 8px; }}
@@ -73,9 +84,13 @@ def workspace_style(c):
         QPushButton:hover, QPushButton:checked, QPushButton:pressed {{ background: {c['hover']}; }}
         QPushButton[primary="true"] {{ background: {c['accent']}; border-color: {c['accent']}; color: white; font-weight: 600; }}
         QPushButton[primary="true"]:hover, QPushButton[primary="true"]:pressed {{ background: {c['accent_hover']}; }}
+        QPushButton[modeChoice="true"]:checked {{
+            background: {c['accent']}; color: white; border-color: {c['accent']}; font-weight: 600;
+        }}
         QPushButton:disabled, QPushButton[primary="true"]:disabled {{
             background: transparent; color: {c['disabled']}; border-color: {c['line']};
         }}
         QPushButton:focus, QPushButton[primary="true"]:focus {{ border: 1px solid {c['focus']}; }}
+        QPushButton[modeChoice="true"]:focus {{ border: 2px solid {c['focus']}; padding: 4px 9px; }}
         QCheckBox:focus {{ outline: 1px solid {c['focus']}; }}
     """
