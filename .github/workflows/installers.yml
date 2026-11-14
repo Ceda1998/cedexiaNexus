@@ -1,0 +1,95 @@
+name: Desktop installers
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/installers.yml
+      - installers/**
+      - scripts/package_*.py
+      - scripts/windows_desktop_entry.py
+      - nexus_ui/**
+      - requirements-ui.txt
+      - config/model-manifest.json
+      - docs/installation.md
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Installer / ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-15]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    env:
+      QT_QPA_PLATFORM: offscreen
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: '3.11'
+      - name: Install build dependencies
+        run: python -m pip install -r requirements-ui.txt pyinstaller==6.22.3
+      - name: Test desktop
+        run: python -m unittest discover -s tests -v
+      - name: Build and exercise Windows installer
+        if: runner.os == 'Windows'
+        run: python -m scripts.package_installers
+      - name: Build Mac application and PKG
+        if: runner.os == 'macOS'
+        run: python -m scripts.package_macos
+      - name: Install Mac PKG twice and test installed app
+        if: runner.os == 'macOS'
+        run: |
+          installer -pkg dist/installers/CedexiaNexus-macOS-arm64.pkg -target CurrentUserHomeDirectory
+          installer -pkg dist/installers/CedexiaNexus-macOS-arm64.pkg -target CurrentUserHomeDirectory
+          python - <<'PY'
+          from pathlib import Path
+          from scripts.package_windows import smoke_package
+          app = Path.home() / 'Applications/Cedexia Nexus.app/Contents/MacOS/Cedexia Nexus'
+          smoke_package(app, Path('local/mac-package').resolve())
+          PY
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: installer-${{ runner.os }}
+          path: dist/installers/
+          if-no-files-found: error
+          retention-days: 14
+
+  publish:
+    name: Publish installers
+    needs: build
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5
+        with:
+          pattern: installer-*
+          merge-multiple: true
+          path: release-files
+      - name: Publish both tested installers as a prerelease
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          cd release-files
+          sha256sum --check *.sha256
+          cd ..
+          release_tag="desktop-${GITHUB_SHA:0:7}"
+          if gh release view "$release_tag" >/dev/null 2>&1; then
+            echo "Release already exists; immutable installer files are retained."
+          else
+            gh release create "$release_tag" release-files/* --target "$GITHUB_SHA" --title "Cedexia Nexus · ${GITHUB_SHA:0:7}" --prerelease --notes-file installers/release-notes.md
+          fi

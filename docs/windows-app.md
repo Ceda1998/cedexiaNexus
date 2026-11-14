@@ -1,12 +1,18 @@
 # Cedexia Nexus auf Windows starten
 
+Für die geführte Installation den neuen **Windows-Setup-Assistenten** aus den
+[GitHub-Releases](https://github.com/Ceda1998/cedexiaNexus/releases) verwenden.
+Er installiert die App und Laufzeiten, legt Verknüpfungen an und bietet eine
+Deinstallation. [Anleitung und Voraussetzungen](installation.md).
+Die folgende Anleitung beschreibt weiterhin das portable Paket ohne Installer.
+
 1. Das Paket **CedexiaNexus-Windows-x64** aus dem erfolgreichen
    [Windows-Paketlauf](https://github.com/Ceda1998/cedexiaNexus/actions/workflows/windows-app.yml) herunterladen.
 2. Das vollständige ZIP entpacken und im Ordner **CedexiaNexus**
    **CedexiaNexus.exe** doppelklicken. Der Ordner `_internal` gehört zur App.
-3. Unter **Lokales Modell** über **GGUF hinzufügen …** eine oder mehrere
+3. Unter **Einstellungen → Modelle** über **GGUF hinzufügen …** eine oder mehrere
    vorhandene `.gguf`-Dateien hinzufügen. Das Modell in der Liste wählen,
-   eine Frage eingeben und **Lokal starten** klicken. Die App merkt sich die
+   eine Frage eingeben und **Senden** klicken. Die App merkt sich die
    Dateipfade. **Eintrag entfernen** entfernt den Pfad aus der Liste.
 
 Bei geteilten GGUFs den ersten Teil auswählen und alle Teile im selben Ordner

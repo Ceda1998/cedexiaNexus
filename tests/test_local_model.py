@@ -166,6 +166,17 @@ class LocalModelTests(unittest.TestCase):
             self.assertIn("Runtime fehlt", real.unavailable_reason())
         real.deleteLater()
 
+    def test_frozen_macos_uses_the_bundled_runtime(self):
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            settings = QSettings(str(root / 'settings.ini'), QSettings.Format.IniFormat)
+            with patch('nexus_ui.local_model.sys.frozen', True, create=True), patch('nexus_ui.local_model.platform.system', return_value='Darwin'), patch('nexus_ui.local_model.QSettings', return_value=settings):
+                runner = LocalRunner(root=root)
+            self.assertEqual(runner.runtime, root / 'runtime/llama-completion')
+            arguments = runner.verifier_arguments('--gguf')
+            self.assertIn('--verify-local-model', arguments)
+            runner.deleteLater()
+
     def test_windows_model_selection_persists_and_forgetting_keeps_files(self):
         with TemporaryDirectory() as directory:
             root = Path(directory)

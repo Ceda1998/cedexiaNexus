@@ -365,6 +365,9 @@ def main(smoke=False):
         Client('https://example.invalid/mcp')
     from .workspace import Workspace
     window = Workspace()
+    if smoke and getattr(sys, 'frozen', False):
+        import subprocess
+        subprocess.run([str(window.runner.runtime), '--version'], check=True, timeout=30)
     window.show()
     if smoke:
         QTimer.singleShot(100, app.quit)

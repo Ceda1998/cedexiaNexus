@@ -1,0 +1,9 @@
+﻿Die Installation ist abgeschlossen.
+
+1. Starte Cedexia Nexus über das Startmenü oder die optionale Desktop-Verknüpfung.
+2. Öffne Einstellungen → Modelle → GGUF hinzufügen und wähle eine vorhandene Modelldatei.
+3. Wähle das Modell unter dem Chat aus und sende deine erste Nachricht.
+
+Unter Einstellungen findest du auch Skills, MCP-Verbindungen und Geräte. Modellgewichte sind nicht enthalten. Bei geteilten GGUFs wähle den ersten Teil und behalte alle Teile im selben Ordner.
+
+Deinstallation: Windows-Einstellungen → Apps → Cedexia Nexus. Persönliche Chats, Einstellungen und GGUF-Dateien bleiben erhalten.
