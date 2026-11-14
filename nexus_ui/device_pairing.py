@@ -77,8 +77,12 @@ def compare_models(local, peer):
         return "Warte auf den Modellstatus des zweiten Geräts."
     if "checking" in (local["state"], peer["state"]):
         return "GGUF-Gewichte werden im Hintergrund geprüft."
-    if local["state"] != "ready" or peer["state"] != "ready":
-        return "Mindestens einem Gerät fehlt ein prüfbares GGUF-Modell."
+    if local["state"] != "ready" and peer["state"] != "ready":
+        return "Auf beiden Geräten fehlt ein prüfbares GGUF-Modell."
+    if local["state"] != "ready":
+        return "Dieses Gerät kann sein GGUF-Modell nicht prüfen."
+    if peer["state"] != "ready":
+        return "Das zweite Gerät kann sein GGUF-Modell nicht prüfen."
     if same_weights(local, peer):
         return "Identische GGUF-Gewichte auf beiden Geräten."
     return "Die ausgewählten GGUF-Gewichte unterscheiden sich."
@@ -496,11 +500,12 @@ class DevicePairingPage(QWidget):
             return
         path = self.runner.model
         self.source_sent = False
-        self.send_model("checking" if path and path.is_file() else "missing")
+        available = path is not None and path.is_file()
+        self.send_model("checking" if available else "missing")
         if self.probe.state() != QProcess.ProcessState.NotRunning:
             self.cancel_probe()
             return  # The finished handler restarts against the current selection.
-        if not path or not path.is_file():
+        if not available:
             return
         self.probe_path = path
         self.probe.setWorkingDirectory(str(self.runner.root))
@@ -600,17 +605,25 @@ class DevicePairingPage(QWidget):
         for widget in (self.comparison, self.selected, self.remote, self.select, self.recheck):
             widget.setVisible(self.connected)
         path = self.runner.model
-        self.selected.setText(f"Hier ausgewählt · {path.name}" if path else "Hier ist kein Modell ausgewählt.")
+        local_state = self.local_model["state"]
+        if path is None:
+            self.selected.setText("Dieses Gerät · Kein Modell ausgewählt.")
+        elif self.connected and local_state == "missing":
+            self.selected.setText(f"Dieses Gerät · {path.name} · Datei am gespeicherten Ort nicht gefunden. Wähle sie erneut aus.")
+        elif local_state == "error":
+            self.selected.setText(f"Dieses Gerät · {path.name} · Prüfung fehlgeschlagen. Prüfe, ob die GGUF vollständig und lokal lesbar ist.")
+        else:
+            self.selected.setText(f"Hier ausgewählt · {path.name}")
         self.comparison.setText(compare_models(self.local_model, self.peer_model))
         peer = self.peer_model or {}
         if peer.get("state") == "ready":
             self.remote.setText(f"Zweites Gerät · {peer['name']} · {peer['size'] / 1024**3:.2f} GiB · {peer['parts']} Datei(en)")
         elif peer.get("state") == "error":
-            self.remote.setText("GGUF konnte nicht geprüft werden. Datei und bei Split-GGUF alle Teile prüfen.")
+            self.remote.setText("Zweites Gerät · Prüfung fehlgeschlagen. Prüfe dort die GGUF und bei geteilten Modellen alle Dateiteile.")
+        elif peer.get("state") == "missing":
+            self.remote.setText("Zweites Gerät · Keine GGUF-Datei verfügbar.")
         else:
             self.remote.clear()
-        if self.local_model["state"] == "error":
-            self.selected.setText("Lokales GGUF konnte nicht geprüft werden. Datei und bei Split-GGUF alle Teile prüfen.")
         local_ready = self.local_model["state"] == "ready"
         peer_waiting = not peer or peer["state"] == "checking"
         matching = bool(peer and same_weights(self.local_model, peer))

@@ -154,7 +154,10 @@ Modellgewichte und belegen keine Modellqualität oder verteilte Inferenz.
 
 Der Abgleich vergleicht SHA-256, Größe und Anzahl der Dateien. Unterschiedliche
 Namen sind bei identischem Inhalt möglich. Der Status beschreibt die geprüften
-Dateien zum Zeitpunkt des Abgleichs. Die Geräteansicht startet keinen
+Dateien zum Zeitpunkt des Abgleichs. Fehlt eine ausgewählte Datei am
+gespeicherten Ort, zeigt das Gerätefenster ihren Namen und das betroffene Gerät.
+Dort die Datei erneut auswählen oder am gespeicherten Ort wiederherstellen und
+**Gewichte erneut prüfen** wählen. Die Geräteansicht startet keinen
 Inferenzauftrag. Gemeinsame Modellberechnung wird separat in NX-011 geprüft.
 Die Verbindung nutzt die gewählte private IPv4-Adresse auf beiden Geräten.
 Gast-WLANs mit Client-Isolation, getrennte Netzsegmente und Host-Firewalls

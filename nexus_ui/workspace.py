@@ -337,6 +337,7 @@ class Workspace(QMainWindow):
             self.pairing.reload_interfaces()
         self.devices.show()
         self.devices.raise_()
+        self.devices.activateWindow()
 
     def connection_state(self):
         connected = self.pairing.connected
