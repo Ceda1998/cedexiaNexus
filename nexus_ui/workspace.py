@@ -205,7 +205,7 @@ class Workspace(QMainWindow):
         self.runner.model_changed.connect(self.refresh_models)
         self.models.currentIndexChanged.connect(self.choose_model)
         self.tree.currentItemChanged.connect(self.select_chat)
-        self.mode_buttons.idClicked.connect(self.change_mode)
+        self.mode_buttons.idToggled.connect(self.mode_toggled)
         self.prompt.textChanged.connect(self.refresh)
         self.refresh_tree()
         self.refresh_models()
@@ -318,6 +318,10 @@ class Workspace(QMainWindow):
         for path in paths:
             self.runner.select_model(path)
         self.refresh_models()
+
+    def mode_toggled(self, _mode, checked):
+        if checked:
+            self.change_mode()
 
     def change_mode(self):
         self.add_device.setVisible(self.multi_mode.isChecked())
