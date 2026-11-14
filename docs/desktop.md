@@ -50,9 +50,11 @@ Modellstart und sind derzeit global. Skills und MCP-Freigaben gelten pro Chat.
 Der Diktatbutton erklärt den Einstieg in die Systemdiktierfunktion. Eine eigene
 Audioaufnahme oder Transkriptionsruntime ist noch offen.
 
-Im Gerätemodus öffnet **Gerät hinzufügen** den vollständigen Kopplungsdialog.
-Nach der Verbindung erscheint wieder das Chatfenster. Senden im Gerätemodus
-wartet auf die gemeinsame Inferenz aus NX-011. Die bisherigen Modellprüfungen
+Im Mehrgeräte-Modus öffnet **Geräte verbinden …** den Kopplungsdialog.
+Nach der Verbindung erscheint wieder das Chatfenster. Für eine lokale Antwort
+**Zu Einzelgerät wechseln** am Eingabefeld wählen. Der Entwurf und die
+bestehende Kopplung bleiben dabei erhalten. Gemeinsames Senden hängt von
+der Inferenz aus NX-011 ab. Die bisherigen Modellprüfungen
 und Demoansichten bleiben unter den erweiterten Einstellungen erreichbar.
 Der Zwei-Fenster-Kopplungstest und die bisherigen Runtime-Tests bleiben aktiv.
 

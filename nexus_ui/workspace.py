@@ -157,6 +157,15 @@ class Workspace(QMainWindow):
         entry = QVBoxLayout(composer_panel)
         entry.setContentsMargins(9, 8, 9, 9)
         entry.setSpacing(6)
+        self.device_chat_notice = QWidget()
+        device_chat_row = QHBoxLayout(self.device_chat_notice)
+        device_chat_row.setContentsMargins(0, 0, 0, 0)
+        self.device_chat_hint = QLabel('Der Mehrgeräte-Modus prüft die Modellgewichte. Chat-Antworten sind derzeit im Einzelgerät-Modus verfügbar.')
+        self.device_chat_hint.setObjectName('libraryStatus')
+        self.device_chat_hint.setWordWrap(True)
+        device_chat_row.addWidget(self.device_chat_hint, 1)
+        self.switch_to_local = self.button('Zu Einzelgerät wechseln', self.focus_local_chat, device_chat_row)
+        entry.addWidget(self.device_chat_notice)
         self.prompt = QPlainTextEdit()
         self.prompt.setObjectName('chatPrompt')
         self.prompt.setPlaceholderText('Nachricht schreiben …')
@@ -327,6 +336,10 @@ class Workspace(QMainWindow):
         self.status.setText('Lokal · Bereit' if self.local_mode.isChecked() else self.device_mode_status())
         self.refresh()
 
+    def focus_local_chat(self):
+        self.local_mode.setChecked(True)
+        self.prompt.setFocus()
+
     def device_mode_status(self):
         if self.pairing.connected:
             return 'Geräte verbunden · Modellabgleich im Gerätefenster'
@@ -423,13 +436,16 @@ class Workspace(QMainWindow):
         busy = self.runner.busy
         for widget in (self.tree, self.new_project, self.new_chat, self.delete_chat, self.models, self.skill_button, self.mcp_button, self.mode):
             widget.setEnabled(not busy)
+        local = self.local_mode.isChecked()
+        self.device_chat_notice.setVisible(not local)
         self.prompt.setReadOnly(busy)
-        can_send = (not busy and self.local_mode.isChecked()
+        self.prompt.setPlaceholderText('Nachricht schreiben …' if local else 'Entwurf für den Einzelgerät-Modus …')
+        can_send = (not busy and local
                     and bool(self.prompt.toPlainText().strip()) and not self.runner.unavailable_reason())
         self.send.setEnabled(can_send)
-        self.send.setToolTip('' if self.local_mode.isChecked() else 'Zum Chatten Einzelgerät wählen.')
+        self.send.setToolTip('' if local else 'Zum Chatten Einzelgerät wählen.')
         self.stop.setVisible(busy)
-        self.send.setVisible(not busy)
+        self.send.setVisible(not busy and local)
 
     def copy_answer(self):
         for message in reversed(self.messages):
