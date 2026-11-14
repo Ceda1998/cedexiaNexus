@@ -13,6 +13,7 @@ from PySide6.QtWidgets import (
 )
 
 from .pairing_transport import PairingThread, lan_address, valid_source
+from .device_discovery import DeviceDiscovery, network_interface
 from .wifi_status import connected_wifi
 
 MISSING_MODEL = {"type": "model", "state": "missing"}
@@ -85,11 +86,20 @@ def compare_models(local, peer):
 
 class DevicePairingPage(QWidget):
     idle = Signal()
+    discovery_failure = "Geräteerkennung fehlgeschlagen. Prüfe das lokale Netzwerk oder verwende einen Einladungscode."
 
     def __init__(self, runner):
         super().__init__()
         self.runner = runner
         self.thread = None
+        self.discovery = DeviceDiscovery(self)
+        self.discovery.changed.connect(self.refresh_peers)
+        self.discovery.interrupted.connect(self.discovery_interrupted)
+        self.pending_peer = None
+        self.discovery_interface = None
+        self.discovery_network = None
+        self.approving = False
+        self.approval_sent = False
         self.hosting = False
         self.connected = False
         self.local_model = MISSING_MODEL
@@ -139,6 +149,24 @@ class DevicePairingPage(QWidget):
         self.read_wifi = action("WLAN-Namen freigeben …", self.request_wifi_name)
         form.addRow(self.read_wifi)
         form.addRow(self.network_hint)
+        self.search = action("Geräte im Netz suchen", self.start_discovery)
+        self.peers = QComboBox()
+        self.peers.setAccessibleName("Cedexia-Geräte im lokalen Netz")
+        self.peers.setPlaceholderText("Noch kein anderes Gerät gefunden")
+        self.request = action("Kopplung anfragen", self.request_pairing)
+        peer_row = QHBoxLayout()
+        peer_row.addWidget(self.peers, 1)
+        peer_row.addWidget(self.request)
+        self.approval_code = plain_label("", "banner")
+        self.accept = action("Code stimmt überein", lambda: self.approve(True))
+        self.decline = action("Ablehnen", lambda: self.approve(False))
+        approval_row = QHBoxLayout()
+        approval_row.addWidget(self.accept)
+        approval_row.addWidget(self.decline)
+        form.addRow(self.search)
+        form.addRow("Gefundene Geräte", peer_row)
+        form.addRow(self.approval_code)
+        form.addRow(approval_row)
         form.addRow(self.host)
         self.code = QLineEdit()
         self.code.setMaxLength(128)
@@ -182,6 +210,7 @@ class DevicePairingPage(QWidget):
         self.interfaces.currentIndexChanged.connect(self.show_wifi_name)
         self.connection_type.currentIndexChanged.connect(self.reload_interfaces)
         self.code.textChanged.connect(self.refresh)
+        self.peers.currentIndexChanged.connect(self.refresh)
         self.source.textChanged.connect(self.source_changed)
         self.runner.model_changed.connect(self.selection_changed)
         self.reload_interfaces()
@@ -248,6 +277,84 @@ class DevicePairingPage(QWidget):
         if self.thread is None and (address := self.interfaces.currentData()):
             self.begin(PairingThread(address=address, parent=self), hosting=True)
 
+    def start_discovery(self):
+        address = self.interfaces.currentData()
+        if self.thread is not None or not address:
+            return
+        try:
+            self.discovery_interface, self.discovery_network = network_interface(address)
+        except ValueError:
+            self.status.setText("Der Adapter hat kein nutzbares IPv4-Subnetz. Aktualisiere die Adapterliste.")
+            return
+        thread = PairingThread(address=address, discovery_network=self.discovery_network, parent=self)
+        self.begin(thread, hosting=True, status="Geräteerkennung wird gestartet …")
+
+    def discovery_ready(self, port, fingerprint):
+        if self.thread is None or not self.isVisible() or self.thread.cancelled.is_set():
+            return
+        system = {"darwin": 1, "win32": 2}.get(sys.platform, 0)
+        if self.discovery.start(self.thread.address, self.discovery_interface, self.discovery_network,
+                                system, port, fingerprint):
+            identifier = fingerprint.hex()[:8].upper()
+            self.status.setText(f"Dieses Gerät: {identifier}. Starte die Suche auch auf dem anderen Gerät.")
+        else:
+            self.discovery_interrupted()
+
+    def discovery_interrupted(self):
+        self.close_session()
+        self.status.setText(self.discovery_failure)
+
+    def refresh_peers(self):
+        previous = self.peers.currentData()
+        self.peers.blockSignals(True)
+        self.peers.clear()
+        for peer, _ in self.discovery.peers.values():
+            self.peers.addItem(peer.label, peer)
+        if previous is not None and (index := self.peers.findData(previous)) >= 0:
+            self.peers.setCurrentIndex(index)
+        elif self.peers.count():
+            self.peers.setCurrentIndex(0)
+        self.peers.blockSignals(False)
+        self.refresh()
+
+    def request_pairing(self):
+        if self.request.isEnabled():
+            self.pending_peer = self.peers.currentData()
+            self.discovery.close()
+            self.thread.stop()
+            self.refresh()
+
+    def show_approval(self, code):
+        if self.thread is None or self.thread.cancelled.is_set():
+            return
+        self.approving = True
+        self.approval_sent = False
+        self.approval_code.setText(
+            f"Kopplungsanfrage · {code}\nVergleiche diesen Code auf beiden Geräten und bestätige auf beiden Seiten."
+        )
+        self.refresh()
+
+    def hide_approval(self):
+        self.approving = False
+        self.approval_sent = False
+        self.refresh()
+
+    def approve(self, accepted):
+        if self.approving and not self.approval_sent and self.thread is not None:
+            self.thread.decide(accepted)
+            self.approval_sent = True
+            if accepted:
+                heading = self.approval_code.text().partition("\n")[0]
+                self.approval_code.setText(f"{heading}\nWarte auf die Bestätigung des anderen Geräts.")
+            else:
+                self.hide_approval()
+            self.refresh()
+
+    def hideEvent(self, event):
+        if self.thread is not None and self.thread.uses_discovery and not self.connected:
+            self.close_session()
+        super().hideEvent(event)
+
     def start_join(self):
         if self.thread is not None or not (address := self.interfaces.currentData()):
             return
@@ -260,14 +367,17 @@ class DevicePairingPage(QWidget):
         self.clear_invitation()
         self.begin(thread, hosting=False)
 
-    def begin(self, thread, hosting):
+    def begin(self, thread, hosting, status=None):
         self.thread = thread
         self.hosting = hosting
-        self.status.setText("Einladung wird erstellt …" if hosting else "Verbindung wird aufgebaut …")
+        self.status.setText(status or ("Einladung wird erstellt …" if hosting else "Verbindung wird aufgebaut …"))
         thread.invitation.connect(self.invitation_ready)
+        thread.advertised.connect(self.discovery_ready)
+        thread.approval_requested.connect(self.show_approval)
+        thread.approval_ended.connect(self.hide_approval)
         thread.connected.connect(self.peer_connected)
         thread.message.connect(self.receive_message)
-        thread.ended.connect(self.status.setText)
+        thread.ended.connect(self.show_session_end)
         thread.finished.connect(self.session_finished)
         self.code.clear()
         self.refresh()
@@ -295,12 +405,20 @@ class DevicePairingPage(QWidget):
         if self.thread is None or self.thread.cancelled.is_set():
             return
         self.connected = True
+        self.discovery.close()
         self.clear_invitation()
         label = self.connection_type.currentText()
         self.status.setText(f"Geräte verbunden · {label} · verschlüsselt")
         self.check_model()
 
+    def show_session_end(self, status):
+        if self.pending_peer is None and self.status.text() != self.discovery_failure:
+            self.status.setText(status)
+
     def close_session(self):
+        self.pending_peer = None
+        self.discovery.close()
+        self.hide_approval()
         if self.thread is not None:
             self.connected = False
             self.thread.stop()
@@ -313,6 +431,7 @@ class DevicePairingPage(QWidget):
         return self.thread is not None or self.probe.state() != QProcess.ProcessState.NotRunning
 
     def session_finished(self):
+        self.discovery.close()
         self.clear_invitation()
         self.thread.deleteLater()
         self.thread = None
@@ -325,6 +444,12 @@ class DevicePairingPage(QWidget):
         self.offer_digest = None
         self.source.clear()
         self.cancel_probe()
+        self.hide_approval()
+        peer, self.pending_peer = self.pending_peer, None
+        if peer is not None and self.isVisible():
+            thread = PairingThread(discovered_peer=peer.target, source_address=self.interfaces.currentData(), parent=self)
+            self.begin(thread, hosting=False, status=f"Kopplungsanfrage an {peer.label} wird gesendet …")
+            return
         self.refresh()
         if not self.busy:
             self.idle.emit()
@@ -393,7 +518,7 @@ class DevicePairingPage(QWidget):
         model = {"type": "model", "state": state, **fields}
         self.thread.send(model)
         self.local_model = model
-        if state == "ready" and self.hosting and model["sha256"] != self.offer_digest:
+        if state == "ready" and self.thread.can_offer and model["sha256"] != self.offer_digest:
             self.offer_digest = model["sha256"]
             self.source.setText(pinned_source(self.runner.root, model))
         self.refresh()
@@ -429,6 +554,15 @@ class DevicePairingPage(QWidget):
         self.interfaces.setEnabled(not active)
         self.reload.setEnabled(not active)
         self.host.setEnabled(not active and has_address)
+        self.search.setEnabled(not active and has_address)
+        browsing = (active and self.discovery.timer.isActive() and not self.approving
+                    and not self.thread.cancelled.is_set())
+        self.peers.setEnabled(browsing and bool(self.peers.count()))
+        self.request.setEnabled(browsing and self.peers.currentData() is not None)
+        for widget in (self.approval_code, self.accept, self.decline):
+            widget.setVisible(self.approving)
+        self.accept.setEnabled(not self.approval_sent)
+        self.decline.setEnabled(not self.approval_sent)
         self.code.setReadOnly(active)
         self.join.setEnabled(not active and has_address and bool(self.code.text().strip()))
         self.copy.setVisible(active and self.hosting and not self.connected)
@@ -453,11 +587,11 @@ class DevicePairingPage(QWidget):
         local_ready = self.local_model["state"] == "ready"
         peer_waiting = not peer or peer["state"] == "checking"
         matching = bool(peer and same_weights(self.local_model, peer))
-        can_offer = self.connected and self.hosting and local_ready and not peer_waiting and not matching
+        can_offer = self.connected and self.thread.can_offer and local_ready and not peer_waiting and not matching
         self.source.setVisible(can_offer)
         self.share.setVisible(can_offer)
         self.share.setEnabled(can_offer and not self.source_sent and valid_source(self.source.text().strip()))
-        show_source = self.connected and not self.hosting and bool(self.received_source) and not matching
+        show_source = self.connected and not self.thread.can_offer and bool(self.received_source) and not matching
         self.open_source.setVisible(show_source)
         self.notice.setVisible(show_source or (can_offer and self.source_sent))
         if show_source:

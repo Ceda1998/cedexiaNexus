@@ -97,6 +97,7 @@ def main():
     info.update(CFBundleShortVersionString=version, CFBundleVersion=version, LSMinimumSystemVersion='14.0')
     explanation = 'Cedexia Nexus zeigt den Namen des verbundenen WLANs an, damit du den passenden Adapter beim Koppeln erkennst.'
     info.update(NSLocationUsageDescription=explanation, NSLocationWhenInUseUsageDescription=explanation)
+    info['NSLocalNetworkUsageDescription'] = 'Cedexia Nexus findet andere Geräte im lokalen Netz und verbindet sie nach deiner Bestätigung.'
     with (APP / 'Contents/Info.plist').open('wb') as stream:
         plistlib.dump(info, stream)
     (resources / 'licenses/Metal-runtime.txt').write_text(f'{RELEASE}{ARCHIVE}\nSHA-256: {SHA256}\nRevision: {REVISION}\n', encoding='utf-8')

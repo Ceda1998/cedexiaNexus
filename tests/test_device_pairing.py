@@ -16,8 +16,9 @@ try:
     from PySide6.QtNetwork import QNetworkInterface
     from nexus_ui.app import NexusWindow, make_application
     from nexus_ui.device_pairing import pinned_source
+    from nexus_ui.device_discovery import ANNOUNCEMENT, DiscoveredPeer, parse_announcement
     from nexus_ui.local_model import LocalRunner
-    from nexus_ui.pairing_transport import make_invitation, read_invitation, valid_source
+    from nexus_ui.pairing_transport import PairingThread, make_invitation, read_invitation, valid_source
 except ModuleNotFoundError as exc:
     if exc.name != "PySide6":
         raise
@@ -70,6 +71,92 @@ class DevicePairingTests(unittest.TestCase):
         model = {"sha256": artifact["sha256"], "size": artifact["size_bytes"], "parts": 1}
         self.assertIn(artifact["revision"], pinned_source(root, model))
         self.assertEqual(pinned_source(root, {**model, "sha256": "0" * 64}), "")
+
+    def test_discovery_announcement_is_scoped_to_subnet(self):
+        network = ipaddress.ip_network("192.168.1.0/24")
+        fingerprint = bytes(range(32))
+        wire = ANNOUNCEMENT.pack(b"CN01", 2, 49200, fingerprint)
+        peer = parse_announcement(wire, "192.168.1.25", network, bytes(32))
+        self.assertIn("Windows", peer.label)
+        self.assertEqual(peer.target, ("192.168.1.25", 49200, fingerprint, None))
+        for data, address, own in ((wire, "192.168.2.25", bytes(32)),
+                                   (wire, "192.168.1.25", fingerprint),
+                                   (wire + b"x", "192.168.1.25", bytes(32))):
+            with self.assertRaises(ValueError):
+                parse_announcement(data, address, network, own)
+
+    def test_discovery_tls_requires_both_devices_to_accept(self):
+        network = ipaddress.ip_network("127.0.0.0/8")
+        self.enterContext(patch("nexus_ui.pairing_transport.LAN_NETWORKS", (network,)))
+        offered, codes, received = [], [], []
+        host = PairingThread(address="127.0.0.1", discovery_network=network)
+        host.advertised.connect(lambda port, pin: offered.append((port, pin)))
+        host.approval_requested.connect(lambda code: codes.append(("host", code)))
+        host.message.connect(received.append)
+
+        def stop(thread):
+            thread.stop()
+            self.wait_for(thread.isFinished)
+
+        host.start()
+        self.addCleanup(stop, host)
+        self.wait_for(lambda: bool(offered))
+        port, pin = offered[0]
+        for approve in (False, True):
+            codes.clear()
+            client = PairingThread(discovered_peer=("127.0.0.1", port, pin, None), source_address="127.0.0.1")
+            client.approval_requested.connect(lambda code: codes.append(("client", code)))
+            client.start()
+            self.addCleanup(stop, client)
+            self.wait_for(lambda: len(codes) == 2)
+            self.assertEqual(codes[0][1], codes[1][1])
+            self.assertFalse(client.joined)
+            self.assertFalse(host.joined)
+            host.decide(approve)
+            if not approve:
+                # A refusal wakes the other device without waiting for a second click.
+                self.wait_for(client.isFinished)
+                self.assertFalse(client.joined)
+                self.assertFalse(host.joined)
+                continue
+            client.decide(True)
+            self.wait_for(lambda: host.joined and client.joined)
+            message = {"type": "model", "state": "missing"}
+            client.send(message)
+            self.wait_for(lambda: received == [message])
+
+    def test_discovery_dialog_selects_peer_and_shows_confirmation(self):
+        root = Path(self.enterContext(tempfile.TemporaryDirectory()))
+        network = ipaddress.ip_network("127.0.0.0/8")
+        self.enterContext(patch("nexus_ui.pairing_transport.LAN_NETWORKS", (network,)))
+        self.enterContext(patch("nexus_ui.device_pairing.lan_interfaces", return_value={
+            "127.0.0.1": ("WLAN", QNetworkInterface.InterfaceType.Wifi, "Testnetz"),
+        }))
+        self.enterContext(patch("nexus_ui.device_pairing.network_interface", return_value=(None, network)))
+        source, target = [self.window(root, name).pairing for name in ("source", "target")]
+        with patch.object(source.discovery, "start", return_value=True), patch.object(target.discovery, "start", return_value=True):
+            published = []
+            target.search.click()
+            target.thread.advertised.connect(lambda port, pin: published.append((port, pin)))
+            source.search.click()
+            self.wait_for(lambda: bool(published) and "Dieses Gerät" in source.status.text())
+            port, pin = published[0]
+            peer = DiscoveredPeer("127.0.0.1", port, pin, 2)
+            source.discovery.peers[pin] = (peer, time.monotonic() + 5)
+            source.refresh_peers()
+            self.assertEqual(source.peers.currentData(), peer)
+            source.discovery.timer.start(60000)
+            source.refresh()
+            source.request.click()
+            self.wait_for(lambda: source.approving and target.approving)
+            self.assertEqual(source.approval_code.text(), target.approval_code.text())
+            source.accept.click()
+            self.assertFalse(source.connected)
+            self.assertFalse(target.connected)
+            target.accept.click()
+            self.wait_for(lambda: source.connected and target.connected)
+            self.assertFalse(source.discovery.timer.isActive())
+            self.assertFalse(target.discovery.timer.isActive())
 
     def test_two_windows_authenticate_compare_and_share_download(self):
         # Use loopback only in CI so no listener is exposed to the test machine's LAN.

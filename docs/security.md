@@ -44,6 +44,17 @@ Minuten. Nach erfolgreichem Beitritt schließt der Listener. Zertifikat, Schlüs
 und Einladung werden nicht in Dateien gespeichert. Wenn möglich entfernt die
 App den kopierten Code nach Beitritt oder Ablauf aus der Zwischenablage.
 
+**Geräte im Netz suchen** startet zusätzlich UDP-Multicast mit Hop-Limit eins
+auf dem gewählten Adapter. Ankündigungen enthalten die Plattform, den
+temporären TCP-Port und den Zertifikatfingerabdruck. Der Absender muss im
+gleichen privaten IPv4-Subnetz liegen. Die Suche gibt weder Rechnernamen,
+SSID noch Einladungsschlüssel bekannt. Fingerabdrücke aus Discovery dienen
+zum Ansprechen des gefundenen Geräts. Die eigentliche Bestätigung erfolgt
+durch Vergleich eines aus der TLS-Sitzung abgeleiteten Prüfcodes auf beiden
+Geräten. Erst danach werden Modelldaten ausgetauscht. Lokale Teilnehmer können
+gefälschte Ankündigungen oder unerwünschte Anfragen senden. Schließen des
+Dialogs beendet die Suche.
+
 In der Sitzung werden Modellstatus, Dateiname, Größe, Anzahl der Teile,
 SHA-256 und auf Klick eine HTTPS-Bezugsquelle übertragen. Die App überträgt
 keine lokalen Pfade, Modellgewichte oder Prompts. Sie lädt keine Gewichte

@@ -6,7 +6,7 @@ import hashlib
 import hmac
 import ipaddress
 import json
-from queue import Empty, Queue
+from queue import Empty, Full, Queue
 import re
 import secrets
 import select
@@ -27,6 +27,7 @@ LAN_NETWORKS = tuple(ipaddress.ip_network(net) for net in ("10.0.0.0/8", "172.16
 INVITE = struct.Struct("!4sH32s32s")
 MAX_MESSAGE = 4096
 HANDSHAKE_SECONDS = 8
+APPROVAL_SECONDS = 45
 INVITE_SECONDS = 300
 SESSION_SECONDS = 7200
 PEER_ERRORS = (OSError, SSL.Error, ValueError, RecursionError)
@@ -163,20 +164,34 @@ class Channel:
 
 class PairingThread(QThread):
     invitation = Signal(str)
+    advertised = Signal(int, bytes)
+    approval_requested = Signal(str)
+    approval_ended = Signal()
     connected = Signal()
     message = Signal(dict)
     ended = Signal(str)
 
-    def __init__(self, *, address=None, code=None, source_address=None, parent=None):
+    def __init__(self, *, address=None, code=None, source_address=None,
+                 discovery_network=None, discovered_peer=None, parent=None):
         super().__init__(parent)
-        if (address is None) == (code is None):
+        if sum(value is not None for value in (address, code, discovered_peer)) != 1:
             raise ValueError("Select a local address or provide an invitation.")
         self.address = address
         self.source_address = str(lan_address(source_address)) if source_address else None
-        self.target = read_invitation(code) if code is not None else None
+        self.target = read_invitation(code) if code is not None else discovered_peer
+        self.discovery_network = discovery_network
         self.cancelled = Event()
+        self.approval = Queue(maxsize=1)
         self.outgoing = Queue()
         self.joined = False
+
+    @property
+    def uses_discovery(self):
+        return self.discovery_network is not None or (self.target is not None and self.target[3] is None)
+
+    @property
+    def can_offer(self):
+        return (self.target is not None) if self.uses_discovery else (self.target is None)
 
     def stop(self):
         self.cancelled.set()
@@ -184,6 +199,45 @@ class PairingThread(QThread):
     def send(self, message):
         validate_message(message)
         self.outgoing.put(message)
+
+    def decide(self, accepted):
+        try:
+            self.approval.put_nowait(accepted)
+        except Full:
+            pass
+
+    def confirm(self, channel, deadline):
+        code = channel.tls.export_keying_material(b"EXPORTER-Cedexia-Nexus-Pairing", 8).hex().upper()
+        while not self.approval.empty():
+            self.approval.get_nowait()
+        self.approval_requested.emit(f"{code[:4]}-{code[4:8]}-{code[8:12]}-{code[12:]}")
+        peer_approved = False
+        while not self.cancelled.is_set() and time.monotonic() < deadline:
+            try:
+                return self.approval.get_nowait(), peer_approved
+            except Empty:
+                pass
+            try:
+                peer_decision = channel.receive(min(deadline, time.monotonic() + 0.2))
+            except TimeoutError:
+                continue
+            if peer_decision != "accepted" or peer_approved:
+                raise ValueError("Peer did not accept the pairing request.")
+            peer_approved = True
+        return False, peer_approved
+
+    def complete_request(self, channel, deadline, server):
+        try:
+            approved, peer_approved = self.confirm(channel, deadline)
+            channel.send("accepted" if approved else "declined", deadline)
+            if not approved or (not peer_approved and channel.receive(deadline) != "accepted"):
+                return False
+            if server:
+                channel.send("ready", deadline)
+                return True
+            return channel.receive(deadline) == "ready"
+        finally:
+            self.approval_ended.emit()
 
     def run(self):
         try:
@@ -194,6 +248,10 @@ class PairingThread(QThread):
         except PEER_ERRORS:
             if self.joined:
                 status = "Verbindung zum anderen Gerät beendet."
+            elif self.target is not None and self.target[3] is None:
+                status = "Kopplungsanfrage fehlgeschlagen, abgelehnt oder abgelaufen."
+            elif self.discovery_network is not None:
+                status = "Geräteerkennung konnte den lokalen Adapter nicht öffnen."
             elif self.target is None:
                 status = "Einladung beendet. Prüfe die ausgewählte Netzwerkadresse und die Firewall."
             else:
@@ -215,7 +273,11 @@ class PairingThread(QThread):
             listener.bind((address, 0))
             listener.listen(1)
             listener.settimeout(0.2)
-            self.invitation.emit(make_invitation(address, listener.getsockname()[1], fingerprint, secret))
+            port = listener.getsockname()[1]
+            if self.discovery_network is not None:
+                self.advertised.emit(port, fingerprint)
+            else:
+                self.invitation.emit(make_invitation(address, port, fingerprint, secret))
             deadline = time.monotonic() + INVITE_SECONDS
             while not self.cancelled.is_set() and time.monotonic() < deadline:
                 try:
@@ -224,16 +286,25 @@ class PairingThread(QThread):
                     continue
                 with raw:
                     try:
-                        lan_address(peer[0])
+                        peer_address = lan_address(peer[0])
+                        if self.discovery_network is not None and peer_address not in self.discovery_network:
+                            continue
                         channel = Channel(context, raw, True, self.cancelled)
                         handshake = min(deadline, time.monotonic() + HANDSHAKE_SECONDS)
                         channel.call(channel.tls.do_handshake, handshake)
                         proof = channel.receive(handshake)
-                        if not isinstance(proof, str) or not re.fullmatch(r"[0-9a-f]{64}", proof):
-                            continue
-                        if not hmac.compare_digest(secret, bytes.fromhex(proof)):
-                            continue
-                        channel.send("accepted", handshake)
+                        if self.discovery_network is not None:
+                            if proof != "pair":
+                                continue
+                            approval_deadline = min(deadline, time.monotonic() + APPROVAL_SECONDS)
+                            if not self.complete_request(channel, approval_deadline, server=True):
+                                continue
+                        else:
+                            if not isinstance(proof, str) or not re.fullmatch(r"[0-9a-f]{64}", proof):
+                                continue
+                            if not hmac.compare_digest(secret, bytes.fromhex(proof)):
+                                continue
+                            channel.send("accepted", handshake)
                     except PEER_ERRORS:
                         continue
                     listener.close()
@@ -250,9 +321,15 @@ class PairingThread(QThread):
             certificate = channel.tls.get_peer_certificate(as_cryptography=True)
             if certificate is None or not hmac.compare_digest(certificate.fingerprint(hashes.SHA256()), fingerprint):
                 raise ValueError("Certificate does not match the invitation.")
-            channel.send(secret.hex(), deadline)
-            if channel.receive(deadline) != "accepted":
-                raise ValueError("Invitation was rejected.")
+            if secret is None:
+                channel.send("pair", deadline)
+                approval_deadline = time.monotonic() + APPROVAL_SECONDS
+                if not self.complete_request(channel, approval_deadline, server=False):
+                    raise ValueError("Pairing request was rejected.")
+            else:
+                channel.send(secret.hex(), deadline)
+                if channel.receive(deadline) != "accepted":
+                    raise ValueError("Invitation was rejected.")
             self.exchange(channel)
 
     def exchange(self, channel):
@@ -271,6 +348,6 @@ class PairingThread(QThread):
             except TimeoutError:
                 continue
             validate_message(incoming)
-            if incoming["type"] == "source" and self.target is None:
+            if incoming["type"] == "source" and self.can_offer:
                 raise ValueError("Only the inviting device can share a source.")
             self.message.emit(incoming)

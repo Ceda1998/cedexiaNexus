@@ -129,10 +129,13 @@ Modellgewichte und belegen keine Modellqualität oder verteilte Inferenz.
    Falls das Betriebssystem
    den Adaptertyp nicht eindeutig meldet, zeigt **Manuelle Auswahl** alle
    aktiven Adapter mit privater IPv4-Adresse.
-3. Auf einem Gerät **Einladung erstellen** wählen und den Code vertraulich
-   weitergeben. Er gilt fünf Minuten und für einen Beitritt. Auf dem zweiten
-   Gerät den Code einfügen und **Beitreten** klicken. Bei einer Systemabfrage
-   den Zugriff auf das lokale beziehungsweise private Netzwerk erlauben.
+3. Auf beiden Geräten **Geräte im Netz suchen** wählen. Unter **Gefundene
+   Geräte** das zweite Gerät anhand der Kennung auswählen und auf einem Gerät
+   **Kopplung anfragen** klicken. Gleichen Prüfcode auf beiden Geräten
+   vergleichen und auf beiden bestätigen. Bei einer Systemabfrage den Zugriff
+   auf das lokale beziehungsweise private Netzwerk erlauben.
+   Alternativ **Einladung erstellen** wählen, den Code vertraulich weitergeben
+   und auf dem zweiten Gerät mit **Beitreten** verbinden.
 4. Die App prüft die in **Lokales Modell** ausgewählten Dateien im Hintergrund.
    Bei Split-GGUFs den ersten Teil auswählen und alle Teile im selben Ordner
    belassen. Die Prüfung liest jede Datei vollständig. Je nach Größe und
@@ -153,7 +156,19 @@ Dateien zum Zeitpunkt des Abgleichs. Die Geräteansicht startet keinen
 Inferenzauftrag. Gemeinsame Modellberechnung wird separat in NX-011 geprüft.
 Die Verbindung nutzt die gewählte private IPv4-Adresse auf beiden Geräten.
 Gast-WLANs mit Client-Isolation, getrennte Netzsegmente und Host-Firewalls
-können die Verbindung blockieren.
+können die Verbindung blockieren. Die Suche verwendet Multicast im gleichen
+IPv4-Subnetz und endet nach fünf Minuten oder beim Schließen des Dialogs.
+Ein verfügbarer WLAN-Adapter kann auch ohne angezeigten Netzwerknamen genutzt
+werden.
+
+## Modelle verwalten
+
+Unter **Einstellungen → Modelle** eine hinzugefügte GGUF aus der Liste wählen.
+Der Dateipfad unterscheidet gleichnamige Dateien. Kontext, Ausgabelimit,
+Reasoning und unter Windows der CPU-Modus werden pro GGUF-Pfad gespeichert.
+Die bisherigen globalen Werte dienen als Vorgabe. Das Modell für den Chat wird
+weiterhin unter dem Eingabefeld ausgewählt. **Auswahl entfernen** entfernt den
+Bibliothekseintrag und lässt die Datei bestehen.
 
 ## Lokales Modell in der UI testen
 

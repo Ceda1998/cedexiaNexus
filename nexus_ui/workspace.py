@@ -10,9 +10,10 @@ from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QPushButton, QLabel, QComboBox, QTreeWidget, QTreeWidgetItem, QPlainTextEdit,
     QDialog, QListWidget, QStackedWidget, QFormLayout, QSpinBox, QCheckBox, QButtonGroup,
-    QInputDialog, QMessageBox, QFileDialog, QMenu, QScrollArea)
+    QInputDialog, QMessageBox, QMenu, QScrollArea)
 
 from .local_model import LocalRunner
+from .model_settings import ModelSettings
 from .device_pairing import DevicePairingPage
 from .integrations import IntegrationStore, SkillEditor, McpPanel
 from .chat_output import split_reply
@@ -188,7 +189,10 @@ class Workspace(QMainWindow):
         self.devices.resize(820, 760)
         device_layout = QVBoxLayout(self.devices)
         self.pairing = DevicePairingPage(self.runner)
-        device_layout.addWidget(self.pairing)
+        device_scroll = QScrollArea()
+        device_scroll.setWidgetResizable(True)
+        device_scroll.setWidget(self.pairing)
+        device_layout.addWidget(device_scroll)
         self.pairing.select.clicked.connect(lambda: self.open_settings('Modelle'))
         self.pairing.idle.connect(self.finish_close)
         self.device_timer = QTimer(self, interval=500)
@@ -205,6 +209,7 @@ class Workspace(QMainWindow):
         self.runner.status.connect(self.status.setText)
         self.runner.busy_changed.connect(self.refresh)
         self.runner.model_changed.connect(self.refresh_models)
+        self.runner.library_changed.connect(self.refresh_models)
         self.models.currentIndexChanged.connect(self.choose_model)
         self.tree.currentItemChanged.connect(self.select_chat)
         self.mode_buttons.idToggled.connect(self.mode_toggled)
@@ -312,14 +317,6 @@ class Workspace(QMainWindow):
     def choose_model(self, index):
         if index >= 0:
             self.runner.select_model(self.models.itemData(index))
-
-    def pick_model(self):
-        if self.runner.busy:
-            return
-        paths, _ = QFileDialog.getOpenFileNames(self, 'Lokale Modelle', '', 'GGUF (*.gguf)')
-        for path in paths:
-            self.runner.select_model(path)
-        self.refresh_models()
 
     def mode_toggled(self, _mode, checked):
         if checked:
@@ -515,35 +512,7 @@ class Workspace(QMainWindow):
             dark.toggled.connect(lambda value: (self.settings.setValue('dark_theme', value), self.apply_theme()))
             form.addRow(dark)
             add_page(appearance, 'Erscheinungsbild')
-            models = QWidget()
-            form = QFormLayout(models)
-            form.setContentsMargins(0, 0, 0, 0)
-            form.setSpacing(12)
-            notes = QLabel('Gilt ab dem nächsten Modellstart. Ein größerer Kontext benötigt mehr Speicher.')
-            notes.setWordWrap(True)
-            notes.setObjectName('libraryStatus')
-            form.addRow(notes)
-            for key, title, default, minimum, maximum in [('context', 'Kontexttokens', 4096 if self.runner.windows else 16384, 512, 131072), ('predict', 'Ausgabetokens', 2048, 1, 8192)]:
-                field = QSpinBox()
-                field.setRange(minimum, maximum)
-                field.setValue(self.settings.value(key, default, type=int))
-                field.valueChanged.connect(lambda value, k=key: self.settings.setValue(k, value))
-                form.addRow(title, field)
-            reasoning = QCheckBox('Reasoning anfordern (modellabhängig)')
-            reasoning.setChecked(self.settings.value('reasoning', False, type=bool))
-            reasoning.toggled.connect(lambda value: self.settings.setValue('reasoning', value))
-            form.addRow(reasoning)
-            if self.runner.windows:
-                cpu = QCheckBox('CPU statt NVIDIA-GPU verwenden')
-                cpu.setChecked(self.settings.value('windows_cpu', False, type=bool))
-                cpu.toggled.connect(lambda value: self.settings.setValue('windows_cpu', value))
-                form.addRow(cpu)
-            actions = QHBoxLayout()
-            self.button('Modelle hinzufügen …', self.pick_model, actions).setProperty('primary', True)
-            self.button('Auswahl entfernen', self.forget_model, actions)
-            actions.addStretch()
-            form.addRow(actions)
-            add_page(models, 'Modelle')
+            add_page(ModelSettings(self.runner), 'Modelle')
             speech = QWidget()
             speech_layout = QVBoxLayout(speech)
             speech_layout.setContentsMargins(0, 0, 0, 0)
@@ -609,10 +578,6 @@ class Workspace(QMainWindow):
     def set_context(self, text):
         self.pending_context = text
         self.status.setText('MCP-Ergebnis wird bei der nächsten Nachricht mitgesendet.')
-
-    def forget_model(self):
-        self.runner.remove_model()
-        self.refresh_models()
 
     def open_advanced(self):
         if self.advanced is None:
