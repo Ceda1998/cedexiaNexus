@@ -9,6 +9,7 @@ on:
       - installers/**
       - scripts/package_*.py
       - scripts/windows_desktop_entry.py
+      - scripts/verify_model.py
       - nexus_ui/**
       - tests/**
       - requirements-ui.txt

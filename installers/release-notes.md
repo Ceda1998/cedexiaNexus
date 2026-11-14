@@ -1,5 +1,7 @@
 Geführte Installation von Cedexia Nexus mit Python, Qt und llama.cpp. Keine GGUF-Gewichte enthalten, keine Downloads während der Installation.
 
+In Version 0.1.62 sind Einzelgerät und Mehrgeräte direkt in der Seitenleiste sichtbar. Für die Kopplung kann jedes Gerät Ethernet (LAN), WLAN oder seinen Adapter manuell wählen. Scrollleisten sind im dunklen Design besser erkennbar.
+
 - **macOS:** `CedexiaNexus-macOS-arm64.pkg` für Apple Silicon, macOS 14+. Installation ins eigene Benutzerkonto unter `~/Applications`.
 - **Windows:** `CedexiaNexus-Windows-x64-Setup.exe` für Windows 10/11 x64. Für GPU-Inferenz ist ein kompatibler NVIDIA-Treiber erforderlich; CUDA-Laufzeitbibliotheken sind enthalten.
 

@@ -24,6 +24,9 @@ und Versionsmanifest ausliefern.
   ein Ticket mit konkreten To Dos und Abnahmekriterien anlegen.
 - Commitformat: `CN - Ticketnummer - kurze Beschreibung`, zum Beispiel
   `CN - NX-041 - Arbeitsregeln ergänzen`.
+- Nach auslieferbaren Desktop-Änderungen beide Installer aus dem aktuellen
+  Commit bauen. Bei Veröffentlichung den Installer-Workflow bis zum erfolgreichen
+  GitHub-Release prüfen und die Downloadlinks im zugehörigen Ticket hinterlegen.
 
 ## Sicherheitsregeln und Grenzen
 - Keine Modellgewichte automatisch herunterladen, großen Binärdateien oder
