@@ -65,6 +65,9 @@ class LocalRunner(QObject):
         self.received = 0
         self.proof = bytearray()
         self.diagnostics = bytearray()
+        self.thinking_prefilled = False
+        self.output_tail = ""
+        self.input_truncated = False
         self.decoder = codecs.getincrementaldecoder("utf-8")("replace")
         self.timer = QTimer(self)
         self.timer.setSingleShot(True)
@@ -117,11 +120,14 @@ class LocalRunner(QObject):
         self.received = 0
         self.proof.clear()
         self.diagnostics.clear()
+        self.thinking_prefilled = False
+        self.output_tail = ""
+        self.input_truncated = False
         self.decoder.reset()
         self.busy_changed.emit(True)
         self.status.emit("Modelldatei wird geprüft … Die Oberfläche bleibt bedienbar.")
         self.timer.start()
-        self._spawn("verify", sys.executable, self.verifier_arguments("--gguf"))
+        self._spawn("verify", sys.executable, [*self.verifier_arguments("--gguf"), "--chat-format"])
         return True
 
     def verifier_arguments(self, mode):
@@ -132,7 +138,7 @@ class LocalRunner(QObject):
         device, layers, context, predict = (
             ("CUDA0", "32", "4096", "-2") if self.windows else ("MTL0", "all", "16384", "8192")
         )
-        input_args = ["--simple-io", "--escape", "--no-context-shift"] if self.windows else ["--file", "/dev/stdin"]
+        input_args = ["--simple-io", "--escape"] if self.windows else ["--file", "/dev/stdin"]
         context = str(self.settings.value("context", int(context), type=int))
         predict = str(self.settings.value("predict", int(predict), type=int))
         reasoning = "on" if self.settings.value("reasoning", False, type=bool) else "off"
@@ -142,7 +148,7 @@ class LocalRunner(QObject):
             "--batch-size", "128", "--ubatch-size", "128", "--threads", "4",
             "--predict", predict, "--seed", "42", "--temp", "0", "--jinja",
             "--conversation", "--single-turn", "--reasoning", reasoning,
-            "--no-display-prompt", "--color", "off", *input_args,
+            "--no-display-prompt", "--no-context-shift", "--color", "off", *input_args,
         ]
 
     def _spawn(self, phase, program, arguments):
@@ -193,7 +199,9 @@ class LocalRunner(QObject):
                 self.stop("Ausgabelimit erreicht. Lauf beendet.")
                 return
             self.status.emit("Lokale Antwort läuft …")
-            self.output.emit(self.decoder.decode(data))
+            chunk = self.decoder.decode(data)
+            self.output_tail = (self.output_tail + chunk)[-128:]
+            self.output.emit(chunk)
 
     def _error(self, proc, error):
         if proc is self.process and error == QProcess.ProcessError.FailedToStart:
@@ -203,7 +211,11 @@ class LocalRunner(QObject):
     def _read_diagnostics(self, proc):
         data = bytes(proc.readAllStandardError())
         if proc is self.process and self.phase == "generate":
-            self.diagnostics[:] = (self.diagnostics + data)[-8192:]
+            recent = self.diagnostics + data
+            self.diagnostics[:] = recent[-8192:]
+            if b"input too long: skipped" in recent or b"prompt is too long" in recent:
+                self.input_truncated = True
+                self.stop("Der Kontext reicht für diese Eingabe nicht aus. Kürze den Verlauf oder erhöhe die Kontextgröße.")
 
     def _load_error(self):
         log = self.diagnostics.lower()
@@ -232,6 +244,7 @@ class LocalRunner(QObject):
                 proof = json.loads(self.proof)
                 valid = code == 0 and proof.get("header_ok") is True
                 error = GGUF_ERRORS.get(proof.get("error"))
+                self.thinking_prefilled = proof.get("thinking_prefilled") is True
             except (ValueError, AttributeError, TypeError):
                 valid, error = False, None
             self.proof.clear()
@@ -244,8 +257,14 @@ class LocalRunner(QObject):
             self._finish(self._load_error())
         else:
             self.output.emit(self.decoder.decode(b"", final=True))
-            self._finish("Lokaler Lauf beendet." if self.received else
-                         "Der lokale Lauf endete ohne Ausgabe.")
+            if b"context full" in self.diagnostics:
+                self._finish("Kontextlimit erreicht. Die Antwort kann abgeschnitten sein.")
+            elif not self.received:
+                self._finish("Der lokale Lauf endete ohne Ausgabe.")
+            elif not self.output_tail.rstrip().endswith("[end of text]"):
+                self._finish("Die Ausgabe endete vorzeitig. Die Antwort kann abgeschnitten sein.")
+            else:
+                self._finish("Lokaler Lauf beendet.")
 
     def stop(self, reason="Gestoppt. Eingabe bleibt für einen manuellen Neustart erhalten."):
         if not self.busy or self.stop_reason:

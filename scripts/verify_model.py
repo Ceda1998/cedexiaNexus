@@ -64,8 +64,8 @@ def verify(path, manifest):
     }
 
 
-def split_metadata(stream, size):
-    """Read the split markers without loading tensor data or tokenizer arrays into memory."""
+def read_metadata(stream, size, fields, *, stop_when_found=False):
+    """Read selected GGUF scalar fields without loading tensors or tokenizer arrays."""
     def read(fmt):
         length = struct.calcsize(fmt)
         data = stream.read(length)
@@ -90,23 +90,52 @@ def split_metadata(stream, size):
             raise ValueError("unknown GGUF value type")
 
     _, _, _, count = read("<4sIQQ")
-    fields = {}
+    values = {}
     for _ in range(count):
         key_length, = read("<Q")
         if not 0 < key_length <= 65535:
             raise ValueError("invalid GGUF key")
         key = stream.read(key_length)
         kind, = read("<I")
-        if key in (b"split.no", b"split.count"):
-            if kind != 2 or key in fields:
-                raise ValueError("invalid GGUF split metadata")
-            fields[key], = read("<H")
+        if key in fields:
+            if kind != fields[key] or key in values:
+                raise ValueError("invalid GGUF metadata field")
+            if kind == 8:
+                length, = read("<Q")
+                if length > min(262144, size - stream.tell()):
+                    raise ValueError("invalid GGUF metadata text")
+                values[key] = stream.read(length)
+            else:
+                values[key], = read("<H")
+            if stop_when_found and len(values) == len(fields):
+                break
         elif kind == 9:
             element_kind, elements = read("<IQ")
             skip_values(element_kind, elements)
         else:
             skip_values(kind, 1)
+    return values
+
+
+def split_metadata(stream, size):
+    fields = read_metadata(stream, size, {b"split.no": 2, b"split.count": 2})
     return fields.get(b"split.no", 0), fields.get(b"split.count", 1)
+
+
+def completion_prefills_thinking(path):
+    """Recognize Qwen's default generation prefix in the GGUF chat template."""
+    try:
+        with path.open("rb") as stream:
+            fields = read_metadata(stream, os.fstat(stream.fileno()).st_size,
+                                   {b"general.architecture": 8, b"tokenizer.chat_template": 8},
+                                   stop_when_found=True)
+    except (OSError, ValueError):
+        return False
+    template = fields.get(b"tokenizer.chat_template", b"")
+    generation = template.rpartition(b"if add_generation_prompt")[2]
+    return (fields.get(b"general.architecture") in (b"qwen35", b"qwen35moe")
+            and b"<|im_start|>assistant" in generation
+            and re.search(rb"""['"]<think>\\n['"]""", generation) is not None)
 
 
 def fingerprint_gguf(path):
@@ -151,6 +180,7 @@ def main(argv=None):
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument("--gguf", action="store_true", help="check the GGUF header without matching a pinned artifact")
     mode.add_argument("--fingerprint-gguf", action="store_true", help="hash a GGUF and its conventionally named parts")
+    parser.add_argument("--chat-format", action="store_true", help="include chat template information with --gguf")
     args = parser.parse_args(argv)
     try:
         if args.fingerprint_gguf:
@@ -158,6 +188,8 @@ def main(argv=None):
         elif args.gguf:
             error = inspect_gguf(args.model)
             result = {"header_ok": error is None, "error": error}
+            if args.chat_format and error is None:
+                result["thinking_prefilled"] = completion_prefills_thinking(args.model)
         else:
             manifest = json.loads(args.manifest.read_text(encoding="utf-8"))
             result = verify(args.model, manifest)

@@ -91,6 +91,18 @@ class LocalModelTests(unittest.TestCase):
         self.assertEqual(self.runner.phases, ["verify"])
         self.assertIn("unvollständig", self.results[0])
 
+    def test_completion_rejects_truncated_input(self):
+        self.runner.generate_code = (
+            'import sys,time; sys.stdin.read(); '
+            'sys.stderr.write("<<input too long: skipped 123 tokens>>"); '
+            'sys.stderr.flush(); time.sleep(5)'
+        )
+        self.assertTrue(self.runner.start("context test"))
+        self.wait(lambda: not self.runner.busy)
+        self.assertTrue(self.runner.input_truncated)
+        self.assertIn("Der Kontext reicht", self.results[0])
+        self.assertEqual(self.output, [])
+
     def test_stop_during_verification_and_manual_restart(self):
         self.runner.verify_code = 'import time; time.sleep(30)'
         self.runner.start("test")
@@ -201,7 +213,7 @@ class LocalModelTests(unittest.TestCase):
                 self.assertEqual(runner.model, first)
                 with patch.object(runner, "_spawn") as spawn:
                     self.assertTrue(runner.start("Test"))
-                    self.assertEqual(spawn.call_args.args[2][-2:], [str(first), "--gguf"])
+                    self.assertEqual(spawn.call_args.args[2][-3:], [str(first), "--gguf", "--chat-format"])
                     self.assertFalse(page.choose_model.isEnabled())
                     runner.stop()
                 page.remove_model.click()

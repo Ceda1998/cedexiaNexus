@@ -13,11 +13,31 @@ App-Datenverzeichnis gespeichert. Beim Neustart öffnet sich der zuletzt
 angelegte Chat. Chats lassen sich nach Bestätigung löschen. Die Datenbank ist
 unverschlüsselt und unterliegt dem Zugriffsschutz des Benutzerkontos.
 
-Der lokale Chat übergibt den bisherigen Verlauf als Text an die bestehende
-Runtime. Das Gesamtlimit von 12000 Zeichen gilt einschließlich Verlauf und
-Skills. Bei Überschreitung ist ein neuer Chat erforderlich. Antworten werden
-als Markdown dargestellt. Externe Links öffnen nach Bestätigung, eingebettete
-Bilder werden nicht geladen. Der Kopierbutton kopiert die letzte Antwort.
+Der lokale Chat übergibt Nutzernachrichten und Antworttext an die Runtime.
+Das Gesamtlimit von 12000 Zeichen umfasst Verlauf, Skills und MCP-Kontext.
+Bei Überschreitung kann der Nutzer den Entwurf kürzen oder einen neuen Chat
+beginnen. Die Runtime prüft das tatsächliche Kontextfenster. Meldet sie eine
+gekürzte Eingabe, bricht die App den Lauf ab und übernimmt diese Eingabe
+bei Folgeläufen nicht in den Modellkontext. Bei vollem Kontext endet die
+Generierung ohne Kontextverschiebung. Die vollständige Budgetvorschau vor dem
+Laden des Modells wird in NX-047 behandelt.
+
+Mit NX-048 haben Nutzernachrichten und Antworten eigene Bereiche. Denktext
+steht standardmäßig eingeklappt unter **Denktext anzeigen**. Die Schaltfläche
+ist per Tab und Leertaste bedienbar. Die App erkennt explizite
+`<think>…</think>`-Tags sowie den getesteten Qwen-Chat-Template-Fall, bei dem
+das öffnende Tag bereits im Prompt steht. Fehlt das Ende eines erkannten
+Denkabschnitts, bleibt dieser im Denktext. Bei unbekanntem Format gilt Ausgabe
+ohne Tags als Antworttext. Bereits gespeicherte Antworten werden beim Öffnen
+auf bekannte Marker geprüft.
+
+Antwort und Denktext werden getrennt in der lokalen Chatdatenbank gespeichert.
+Nur Antworttext gelangt in nachfolgende Modellprompts und über **Antwort
+kopieren** in die Zwischenablage. **Code kopieren** übernimmt den Inhalt des
+jeweiligen Markdown-Codeblocks inklusive Zeilenumbrüchen. Markdown rendert ohne
+rohes HTML und Skriptausführung. Externe Links öffnen nach Bestätigung.
+Gestoppte, fehlgeschlagene und möglicherweise abgeschnittene Läufe zeigen
+einen Hinweis an der betroffenen Antwort.
 
 **Einstellungen** öffnet ein separates Fenster mit Schriftgröße, hellem/dunklem
 Erscheinungsbild, Kontext- und Ausgabetokens, Reasoning-Anforderung, lokalen

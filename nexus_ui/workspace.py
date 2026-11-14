@@ -6,21 +6,17 @@ import sqlite3
 import uuid
 
 from PySide6.QtCore import Qt, QStandardPaths, QTimer
-from PySide6.QtGui import QDesktopServices, QTextDocument
+from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QPushButton, QLabel, QComboBox, QTreeWidget, QTreeWidgetItem, QPlainTextEdit,
-    QTextBrowser, QDialog, QTabWidget, QFormLayout, QSpinBox, QCheckBox,
+    QDialog, QTabWidget, QFormLayout, QSpinBox, QCheckBox,
     QInputDialog, QMessageBox, QFileDialog, QMenu, QScrollArea)
 
 from .local_model import LocalRunner
 from .device_pairing import DevicePairingPage
 from .integrations import IntegrationStore, SkillEditor, McpPanel
-
-
-class ChatBrowser(QTextBrowser):
-    def loadResource(self, kind, url):
-        # Model-generated Markdown may contain local or remote image references.
-        return None
+from .chat_output import split_reply
+from .chat_transcript import ChatTranscript
 
 
 class ChatStore:
@@ -63,6 +59,7 @@ class Workspace(QMainWindow):
         self.pending_context = ''
         self.chat_id = None
         self.messages = []
+        self.stream = None
         self.closing = False
         self.advanced = None
         self.render_timer = QTimer(self, interval=100, singleShot=True)
@@ -107,9 +104,7 @@ class Workspace(QMainWindow):
         self.status = QLabel('')
         self.status.setWordWrap(True)
         main.addWidget(self.status)
-        self.transcript = ChatBrowser()
-        self.transcript.setOpenLinks(False)
-        self.transcript.anchorClicked.connect(self.open_link)
+        self.transcript = ChatTranscript(self.open_link)
         main.addWidget(self.transcript, 1)
         self.prompt = QPlainTextEdit()
         self.prompt.setPlaceholderText('Stelle deinem Modell eine Aufgabe …')
@@ -125,7 +120,7 @@ class Workspace(QMainWindow):
         self.dictate = self.button('Diktieren', self.dictation, composer)
         self.send = self.button('Senden', self.submit, composer)
         self.send.setProperty('primary', True)
-        self.stop = self.button('Stoppen', self.runner.stop, composer)
+        self.stop = self.button('Stoppen', lambda: self.runner.stop('Antwort gestoppt.'), composer)
         main.addLayout(composer)
         self.devices = QDialog(self)
         self.devices.setWindowTitle('Gerät hinzufügen · Cedexia Nexus')
@@ -213,6 +208,14 @@ class Workspace(QMainWindow):
         self.chat_id = identifier
         self.title.setText(row[0])
         self.messages = json.loads(row[1])
+        for message in self.messages:
+            if message['role'] == 'assistant' and 'thinking' not in message:
+                reply = split_reply(message['text'], complete=True, legacy=True)
+                message.update(text=reply.answer, thinking=reply.thinking)
+            if message.pop('pending', False):
+                message['status'] = 'Der vorherige Lauf wurde unterbrochen.'
+        self.transcript.clear()
+        self.status.setText('Lokal · Bereit' if self.mode.currentIndex() == 0 else 'Gerätemodus')
         self.pending_context = ''
         self.prompt.clear()
         self.refresh_tree()
@@ -232,6 +235,7 @@ class Workspace(QMainWindow):
             self.messages = []
             self.pending_context = ''
             self.refresh_tree()
+            self.transcript.clear()
             self.render()
 
     def refresh_models(self):
@@ -280,17 +284,21 @@ class Workspace(QMainWindow):
         if not text:
             return
         skill = self.integrations.skill_prompt(self.chat_id)
-        history = '\n\n'.join(('Nutzer' if m['role'] == 'user' else 'Assistent') + ': ' + m['text'] for m in self.messages)
+        history = '\n\n'.join(('Nutzer' if m['role'] == 'user' else 'Assistent') + ': ' + m['text']
+                              for m in self.messages if m['text'] and not m.get('excluded_from_history'))
         prompt = '\n\n'.join(part for part in (skill, history, self.pending_context, 'Nutzer: ' + text) if part)
         if len(prompt) > 12000:
-            self.status.setText('Der Verlauf überschreitet 12000 Zeichen. Beginne einen neuen Chat.')
+            self.status.setText('Die Eingabe mit Verlauf überschreitet 12000 Zeichen. Kürze den Entwurf oder beginne einen neuen Chat.')
             return
         if not self.chat_id:
             self.create_chat()
             self.prompt.setPlainText(text)
-        self.messages.extend([{'role': 'user', 'text': text}, {'role': 'assistant', 'text': ''}])
+        self.messages.extend([{'role': 'user', 'text': text},
+                              {'role': 'assistant', 'text': '', 'thinking': '', 'pending': True}])
+        self.stream = []
         if not self.runner.start(prompt):
             del self.messages[-2:]
+            self.stream = None
             return
         self.prompt.clear()
         self.pending_context = ''
@@ -298,25 +306,39 @@ class Workspace(QMainWindow):
         self.render()
 
     def append_output(self, text):
-        self.messages[-1]['text'] += text
-        if not self.render_timer.isActive():
-            self.render_timer.start()
+        if self.stream is not None and text:
+            self.stream.append(text)
+            if not self.render_timer.isActive():
+                self.render_timer.start()
 
     def render(self):
-        if not self.messages:
-            self.transcript.setPlainText('Womit möchtest du beginnen?\n\nWähle ein lokales Modell und schreibe eine Nachricht.')
-            return
-        # QTextDocument renders Markdown without executing code or loading external resources.
-        html = []
-        for message in self.messages:
-            document = QTextDocument()
-            document.setMarkdown(message['text'], QTextDocument.MarkdownFeature.MarkdownNoHTML)
-            html.append('<h3>' + ('Du' if message['role'] == 'user' else 'Nexus') + '</h3>' + document.toHtml())
-        self.transcript.setHtml(''.join(html))
-        self.transcript.verticalScrollBar().setValue(self.transcript.verticalScrollBar().maximum())
+        if self.stream is not None:
+            reply = split_reply(''.join(self.stream), prefilled=self.runner.thinking_prefilled,
+                                console_prompt=self.runner.windows)
+            if not self.runner.input_truncated:
+                self.messages[-1].update(text=reply.answer, thinking=reply.thinking)
+        self.transcript.render(self.messages, self.stream is not None)
 
     def finished(self, status):
         self.render_timer.stop()
+        if self.stream is not None:
+            reply = split_reply(''.join(self.stream), prefilled=self.runner.thinking_prefilled,
+                                complete=True, console_prompt=self.runner.windows)
+            message = self.messages[-1]
+            message.pop('pending', None)
+            message.update(text=reply.answer, thinking=reply.thinking)
+            if self.runner.input_truncated:
+                message.update(text='', thinking='')
+                self.messages[-2]['excluded_from_history'] = True
+            if status != 'Lokaler Lauf beendet.':
+                message['status'] = status
+                if reply.thinking_open and reply.thinking and not reply.answer and not self.runner.input_truncated:
+                    message['status'] += ' Der Lauf hat nur Denktext geliefert.'
+            elif not reply.answer:
+                message['status'] = 'Denktext ohne finale Antwort.' if reply.thinking else 'Keine Textantwort erhalten.'
+            elif reply.thinking_open:
+                message['status'] = 'Denktext wurde vor dem Abschluss unterbrochen.'
+            self.stream = None
         if self.chat_id:
             self.store.save(self.chat_id, self.messages)
             self.title.setText(self.store.db.execute('SELECT name FROM chats WHERE id=?', (self.chat_id,)).fetchone()[0])
@@ -335,7 +357,7 @@ class Workspace(QMainWindow):
 
     def copy_answer(self):
         for message in reversed(self.messages):
-            if message['role'] == 'assistant':
+            if message['role'] == 'assistant' and message['text']:
                 QApplication.clipboard().setText(message['text'])
                 break
 
@@ -358,10 +380,16 @@ class Workspace(QMainWindow):
         background, panel, foreground, border = ('#141D2B', '#1D293B', '#E9EEF6', '#41516B') if dark else ('#F5F6F8', '#FFFFFF', '#162033', '#D8DEE8')
         self.setStyleSheet(f'''QWidget {{ background: {background}; color: {foreground}; }}
             QWidget#sidebar {{ background: {panel}; border-right: 1px solid {border}; }}
-            QTreeWidget, QTextBrowser {{ background: {background}; border: 0; padding: 12px; }}
+            QTreeWidget {{ background: {background}; border: 0; padding: 12px; }}
+            QScrollArea#chatTranscript, QTextBrowser {{ border: 0; }}
+            QWidget#chatMessage[role="user"], QWidget#chatMessage[role="user"] QLabel,
+            QWidget#chatMessage[role="user"] QTextBrowser {{ background: {panel}; }}
+            QWidget#chatMessage[role="user"] {{ border: 1px solid {border}; border-radius: 8px; }}
+            QLabel#messageAuthor {{ font-weight: bold; }}
             QPlainTextEdit, QComboBox {{ background: {panel}; border: 1px solid {border}; padding: 10px; }}
             QPushButton {{ background: {panel}; border: 1px solid {border}; padding: 9px 12px; }}
             QPushButton[primary="true"] {{ background: #173B70; color: white; }}
+            QPushButton#thinkingToggle:focus {{ border: 2px solid #537EBA; padding: 8px 11px; }}
             QTreeWidget::item:selected {{ background: #173B70; color: white; }}
             QTreeWidget::item {{ padding: 8px; }}''')
 

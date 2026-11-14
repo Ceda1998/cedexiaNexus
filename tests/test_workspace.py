@@ -1,14 +1,18 @@
 """Persistence and runtime integration of the desktop chat entry point."""
 import os
 from pathlib import Path
+import json
 import tempfile
 import time
 import unittest
+from unicodedata import normalize
 from unittest.mock import patch
 
 os.environ.setdefault('QT_QPA_PLATFORM', 'offscreen')
 try:
-    from PySide6.QtCore import QSettings
+    from PySide6.QtCore import QSettings, Qt
+    from PySide6.QtTest import QTest
+    from PySide6.QtWidgets import QApplication
     from nexus_ui.app import make_application
     from nexus_ui.workspace import Workspace, ChatStore
     from test_local_model import FixtureRunner
@@ -20,6 +24,50 @@ except ModuleNotFoundError as exc:
 
 @unittest.skipIf(Workspace is None, 'Install requirements-ui.txt')
 class WorkspaceTests(unittest.TestCase):
+    def test_thinking_is_collapsed_across_streaming_and_restart(self):
+        app, _ = make_application()
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory)
+            settings = QSettings(str(path / 'settings.ini'), QSettings.Format.IniFormat)
+            with patch('nexus_ui.local_model.QSettings', return_value=settings):
+                runner = FixtureRunner()
+            runner.verify_code = 'print(\'{"header_ok":true,"thinking_prefilled":true}\')'
+            runner.generate_code = (
+                'import sys,time; sys.stdin.read(); '
+                'raw="Gr\\u00fc\\u00dfe </think>\\n\\n```html\\n<main>Restaurant</main>\\n``` [end of text]\\n".encode(); '
+                'sys.stdout.buffer.write(raw[:3]); sys.stdout.flush(); time.sleep(.15); '
+                'sys.stdout.buffer.write(raw[3:9]); sys.stdout.flush(); time.sleep(.15); '
+                'sys.stdout.buffer.write(raw[9:]); sys.stdout.flush()'
+            )
+            window = Workspace(runner, path / 'chats.db')
+            self.addCleanup(window.close)
+            window.show()
+            window.prompt.setPlainText('Baue eine Restaurant-Website.')
+            window.submit()
+            deadline = time.monotonic() + 5
+            while runner.busy and time.monotonic() < deadline:
+                app.processEvents()
+                if window.stream and '</think>' not in ''.join(window.stream):
+                    self.assertEqual(window.transcript.rows[-1].answer.toPlainText(), '')
+                time.sleep(.01)
+            self.assertFalse(runner.busy)
+            row = window.transcript.rows[-1]
+            self.assertIn('<main>Restaurant</main>', row.answer.toPlainText())
+            self.assertTrue(row.thinking.isHidden())
+            QTest.keyClick(row.toggle, Qt.Key.Key_Space)
+            self.assertFalse(row.thinking.isHidden())
+            self.assertEqual(normalize('NFC', row.thinking.toPlainText()), 'Grüße')
+            row.copy_actions.itemAt(0).widget().click()
+            self.assertEqual(QApplication.clipboard().text(), '<main>Restaurant</main>\n')
+            window.copy_answer()
+            self.assertNotIn('Grüße', QApplication.clipboard().text())
+            stored = window.store.db.execute('SELECT messages FROM chats WHERE id=?', (window.chat_id,)).fetchone()
+            self.assertEqual(json.loads(stored[0])[-1]['thinking'], 'Grüße')
+            window.load_chat(window.chat_id)
+            self.assertTrue(window.transcript.rows[-1].thinking.isHidden())
+            window.create_chat()
+            self.assertEqual(window.transcript.rows, [])
+
     def test_chat_survives_restart_and_streams_to_selected_chat(self):
         app, _ = make_application()
         with tempfile.TemporaryDirectory() as directory:
