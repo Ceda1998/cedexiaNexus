@@ -10,6 +10,7 @@ on:
       - scripts/package_*.py
       - scripts/windows_desktop_entry.py
       - nexus_ui/**
+      - tests/**
       - requirements-ui.txt
       - config/model-manifest.json
       - docs/installation.md
