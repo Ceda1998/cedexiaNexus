@@ -106,13 +106,14 @@ def smoke_package(executable=None, work=None):
     exe = str(app)
     work = work or WORK
     expected_build = json.loads((work / "build-info.json").read_text(encoding="utf-8"))
-    env = os.environ.copy()
     if platform.system() == "Windows":
         for path in ("_internal/runtime/libomp.dll", f"licenses/{OPENMP_LICENSE}"):
             if not (app.parent / path).is_file():
                 raise ValueError(f"The packaged app is missing {path}.")
         # Prevent a developer toolchain on the runner from supplying missing DLLs via PATH.
-        env["PATH"] = str(Path(env["SystemRoot"]) / "System32")
+        env = os.environ | {"PATH": str(Path(os.environ["SYSTEMROOT"]) / "System32")}
+    else:
+        env = None
     proof = subprocess.run([exe, "--smoke-test"], cwd=work, env=env, timeout=60, capture_output=True)
     if proof.returncode:
         raise RuntimeError(f"Packaged app smoke test failed: {proof.stderr.decode(errors='replace').strip()}")
