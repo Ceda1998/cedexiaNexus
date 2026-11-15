@@ -44,6 +44,11 @@ NX-040 stellt die Repository-Grundlage mit Dokumentation, lokaler Diagnose,
 Unit-Tests und GPU-unabhängiger CI bereit. Der gemeinsame CUDA-/Metal-Lauf
 bleibt ein separates Prototypziel.
 
+NX-011 ergänzt ab 0.1.71 den [experimentellen gemeinsamen Desktop-Chat](docs/distributed-chat.md):
+GPU-Kurztest, automatische Schichtverteilung, gepinnter TLS-Rechenkanal und
+Worker-Rechenzähler. Der Softwarepfad ist mit zwei Prozessen auf dem Mac
+geprüft; die physische CUDA-/Metal-Abnahme steht aus.
+
 ## Installation und lokale Prüfung
 
 Voraussetzung: Git und Python **3.11 oder neuer**. Keine Python-Zusatzpakete,
@@ -115,7 +120,8 @@ Nutzerauftrag lokal heruntergeladen und verifiziert; es ist nicht Teil von Git.
 
 ## Grenzen und Lizenz
 
-Keine automatischen Modell-Downloads, Portfreigaben oder RPC-Starts.
+Keine automatischen Modell-Downloads oder Firewallfreigaben. RPC-Worker
+starten nur nach expliziter Freigabe des gemeinsamen Rechnens in der App.
 Experimentelles llama.cpp RPC niemals ungeschützt öffentlich betreiben; Details
 stehen in [docs/security.md](docs/security.md). Keine privaten IPs, Hostnamen,
 Zugangsdaten oder ungeprüften Rohlogs committen.

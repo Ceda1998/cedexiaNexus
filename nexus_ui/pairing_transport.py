@@ -94,6 +94,10 @@ def validate_message(message):
     if not isinstance(message, dict):
         raise ValueError("Invalid message.")
     kind = message.get("type")
+    if kind == 'compute':
+        from .compute_protocol import validate_compute
+        validate_compute(message)
+        return
     if kind == "model":
         state = message.get("state")
         if state in ("missing", "checking", "error") and message.keys() == {"type", "state"}:
@@ -333,6 +337,8 @@ class PairingThread(QThread):
             self.exchange(channel)
 
     def exchange(self, channel):
+        self.local_address = channel.raw.getsockname()[0]
+        self.peer_address = channel.raw.getpeername()[0]
         self.joined = True
         self.connected.emit()
         expires = time.monotonic() + SESSION_SECONDS

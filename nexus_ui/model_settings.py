@@ -106,8 +106,8 @@ class ModelSettings(QWidget):
 
     def show_settings(self, *_):
         path = self.selected_path()
-        editable = bool(path) and not self.runner.busy
-        self.add.setEnabled(not self.runner.busy)
+        editable = bool(path) and not (self.runner.busy or self.runner.external_busy)
+        self.add.setEnabled(not (self.runner.busy or self.runner.external_busy))
         self.remove.setEnabled(editable)
         self.use.setEnabled(editable and path != str(self.runner.model))
         self.path.setText(path or "Füge eine lokale GGUF-Datei hinzu.")
@@ -121,5 +121,5 @@ class ModelSettings(QWidget):
             field.setEnabled(editable)
 
     def save(self, key, value):
-        if (path := self.selected_path()) and not self.runner.busy:
+        if (path := self.selected_path()) and not (self.runner.busy or self.runner.external_busy):
             self.runner.set_model_setting(path, key, value)

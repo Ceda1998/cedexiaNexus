@@ -55,12 +55,46 @@ Geräten. Erst danach werden Modelldaten ausgetauscht. Lokale Teilnehmer können
 gefälschte Ankündigungen oder unerwünschte Anfragen senden. Schließen des
 Dialogs beendet die Suche.
 
-In der Sitzung werden Modellstatus, Dateiname, Größe, Anzahl der Teile,
+Beim reinen Gewichte-Abgleich werden Modellstatus, Dateiname, Größe, Anzahl der Teile,
 SHA-256 und auf Klick eine HTTPS-Bezugsquelle übertragen. Die App überträgt
 keine lokalen Pfade, Modellgewichte oder Prompts. Sie lädt keine Gewichte
 automatisch und ändert keine Firewallregeln. Wer die Einladung erhält, kann
 damit beitreten. Das Betriebssystem oder ein von ihm verwalteter
 Zwischenablageverlauf kann kopierte Inhalte länger behalten.
+
+## Experimenteller Desktop-Rechenkanal (NX-011)
+
+**Gemeinsames Rechnen aktivieren** auf beiden aktualisierten Apps erweitert
+die gekoppelte Sitzung ausdrücklich um Inferenz. Ein GPU-Kurztest verwendet
+synthetische Eingaben. Die App tauscht Runtime-Revision, GPU-Name, gemeldeten
+freien Speicher und die gemessene Kurztest-Tokenrate aus. Keine Hardware-
+Seriennummern, Rechnernamen oder lokalen Modellpfade werden übertragen.
+
+Der rohe `ggml-rpc-server` bindet ausschließlich an `127.0.0.1`. Ein separater
+TLS-1.3-Listener bindet an den bereits gewählten privaten Adapter. Sein neuer
+Zertifikatfingerabdruck und sein zufälliger 256-Bit-Schlüssel werden nur über
+die bestätigte Kopplung ausgetauscht. Der Tunnel akzeptiert ausschließlich die
+Adresse des gekoppelten Peers, prüft den Schlüssel nach dem TLS-Handshake und
+öffnet den Weg zum Worker nur während einer reservierten Inferenz. Der Client
+prüft den Zertifikatfingerabdruck vor dem Senden des Schlüssels. Ziele werden
+an die Adresse des gekoppelten Peers gebunden. Höchstens acht Verbindungen,
+begrenzte Übertragungspuffer und Zeitlimits begrenzen den Transport.
+
+Über diesen Kanal fließen Modell-Tensoren und Zwischenergebnisse der
+Berechnung. Sie können Informationen über Eingaben enthalten. Daher nur eigene
+vertrauenswürdige Geräte und Testdaten verwenden. TLS schützt den Transport;
+es beseitigt keine Schwachstellen des experimentellen RPC-Parsers. Lokale
+Prozesse könnten den Loopback-Worker ansprechen; dies ist keine Sandbox gegen
+andere Prozesse im selben Benutzer-/Host-Vertrauensbereich.
+
+Stoppen widerruft die laufende Reservierung und schließt ihre Tunnelstreams.
+Trennen, Modellwechsel, Ende der Freigabe oder Schließen der App beendet auch
+Worker und Listener. Inaktivitäts- und Laufzeitlimits ergänzen den manuellen
+Stopp. Abbruch bei einem abrupt unterbrochenen Netzwerk kann bis zum TCP-/
+Tunnel-Zeitlimit dauern. Keine Firewalländerungen, Routerfreigaben, Remote-Shells,
+persistenten Zugangsschlüssel oder installierten Hintergrunddienste.
+RPC-Rohdiagnosen bleiben nur in begrenzten Arbeitsspeicherpuffern; nach außen
+gehen ausschließlich Fehlerklassen, Schichtzahlen und Rechengraph-Zähler.
 
 Die [llama.cpp-RPC-Dokumentation](https://github.com/ggml-org/llama.cpp/blob/master/tools/rpc/README.md)
 stuft den RPC-Pfad als fragilen, unsicheren Proof of Concept ein. Niemals

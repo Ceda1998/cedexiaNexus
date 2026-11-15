@@ -17,7 +17,7 @@ WORK = ROOT / 'local/mac-package'
 APP = ROOT / 'dist/Cedexia Nexus.app'
 ARCHIVE = 'llama-b12347-bin-macos-arm64.tar.gz'
 SHA256 = 'ec208b4889a87b68a5193f3f303d14ba19f1101efea9d3343ba331d79cd3cfbf'
-RUNTIME_FILE = re.compile(r'llama-completion|lib(?:llama(?:-common|-completion-impl)?|mtmd|ggml(?:-base|-cpu|-blas|-metal|-rpc)?)(?:\.\d+)*\.dylib')
+RUNTIME_FILE = re.compile(r'llama-completion|llama-bench|ggml-rpc-server|lib(?:llama(?:-common|-completion-impl|-bench-impl)?|mtmd|ggml(?:-base|-cpu|-blas|-metal|-rpc)?)(?:\.\d+)*\.dylib')
 
 
 def stage_runtime():
@@ -47,6 +47,8 @@ def stage_runtime():
     if not match or not REVISION.startswith(match[1]):
         raise ValueError('Unexpected runtime revision')
     subprocess.run([str(runtime / 'llama-completion'), '--offline', '--list-devices'], check=True, timeout=30)
+    for name in ('llama-bench', 'ggml-rpc-server'):
+        subprocess.run([str(runtime / name), '--help'], check=True, timeout=30)
     return runtime
 
 

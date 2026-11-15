@@ -5,6 +5,7 @@ import json
 import os
 from pathlib import Path
 import platform
+import re
 import sys
 
 from PySide6.QtCore import QObject, QProcess, QProcessEnvironment, QSettings, QTimer, Qt, Signal
@@ -60,6 +61,11 @@ class LocalRunner(QObject):
             self.models.append(str(default_model))
         self.model = Path(saved_model or self.models[0]) if self.models else None
         self.busy = False
+        self.external_busy = False
+        self.distributed = None
+        self.assignment = {}
+        self.diagnostic_tail = ''
+        self.pending_output = bytearray()
         self.process = None
         self.phase = ""
         self.stop_reason = ""
@@ -95,7 +101,7 @@ class LocalRunner(QObject):
         return ""
 
     def add_models(self, paths):
-        if self.busy:
+        if self.busy or self.external_busy:
             return
         updated = list(dict.fromkeys([*self.models, *(str(Path(path).absolute()) for path in paths)]))
         if updated != self.models:
@@ -104,7 +110,7 @@ class LocalRunner(QObject):
             self.library_changed.emit()
 
     def select_model(self, path):
-        if not self.busy:
+        if not self.busy and not self.external_busy:
             previous = self.model
             path = str(Path(path).absolute()) if path else ""
             if path:
@@ -116,7 +122,7 @@ class LocalRunner(QObject):
 
     def remove_model(self, path=None):
         path = Path(path) if path else self.model
-        if self.busy or str(path) not in self.models:
+        if self.busy or self.external_busy or str(path) not in self.models:
             return
         self.models.remove(str(path))
         self.settings.setValue("local_model_paths", self.models)
@@ -142,7 +148,7 @@ class LocalRunner(QObject):
         self.settings.setValue(self.model_setting_key(path, key), value)
 
     def start(self, prompt):
-        if self.busy:
+        if self.busy or self.external_busy:
             return False
         reason = self.unavailable_reason()
         if reason or not prompt.strip() or len(prompt) > 12000:
@@ -154,6 +160,9 @@ class LocalRunner(QObject):
         self.received = 0
         self.proof.clear()
         self.diagnostics.clear()
+        self.assignment.clear()
+        self.diagnostic_tail = ''
+        self.pending_output.clear()
         self.thinking_prefilled = False
         self.output_tail = ""
         self.input_truncated = False
@@ -177,7 +186,7 @@ class LocalRunner(QObject):
         context = str(self.model_setting(self.model, "context"))
         predict = str(self.model_setting(self.model, "predict"))
         reasoning = "on" if self.model_setting(self.model, "reasoning") else "off"
-        return str(self.runtime), [
+        arguments = [
             "--model", str(self.model), "--offline", "--device", device,
             "--n-gpu-layers", layers, "--fit", fit, "--ctx-size", context,
             "--batch-size", "128", "--ubatch-size", "128", "--threads", "4",
@@ -185,6 +194,14 @@ class LocalRunner(QObject):
             "--conversation", "--single-turn", "--reasoning", reasoning,
             "--no-display-prompt", "--no-context-shift", "--color", "off", *input_args,
         ]
+        if self.distributed:
+            config = self.distributed
+            for flag, value in (('--device', config['local']['device'] + ',' + config['remote_device']),
+                                ('--n-gpu-layers', 'all'), ('--fit', 'off')):
+                arguments[arguments.index(flag) + 1] = value
+            arguments = ['--rpc', config['endpoint'], *arguments, '--split-mode', 'layer',
+                          '--tensor-split', config['plan'].split, '--verbosity', '5']
+        return str(self.runtime), arguments
 
     def _spawn(self, phase, program, arguments):
         self.phase = phase
@@ -196,6 +213,7 @@ class LocalRunner(QObject):
             if key.startswith(("LLAMA_", "GGML_")):
                 env.remove(key)
         env.insert("PYTHONIOENCODING", "utf-8")
+        env.insert('GGML_RPC_NO_RDMA', '1')
         proc.setProcessEnvironment(env)
         proc.setProgram(program)
         proc.setArguments(arguments)
@@ -223,17 +241,31 @@ class LocalRunner(QObject):
         data = bytes(proc.readAllStandardOutput())
         if proc is not self.process or self.stop_reason:
             return
-        if self.phase == "verify":
+        if self.phase in ("verify", "devices"):
             if len(self.proof) + len(data) > 8192:
                 self.stop("Modellprüfung lieferte eine ungültige Antwort.")
             else:
                 self.proof.extend(data)
         else:
+            if self.pending_output:
+                data = bytes(self.pending_output) + data
+                self.pending_output.clear()
+            if not data:
+                return
+            if self.distributed and data and not self.assignment_valid():
+                self._read_diagnostics(proc)
+                if not self.assignment_valid():
+                    if len(data) > 1024 * 1024:
+                        self.stop('Keine prüfbare Zuweisung auf beide GPUs. Kein Solo-Fallback.')
+                    else:
+                        self.pending_output.extend(data)
+                    return
             self.received += len(data)
             if self.received > 1024 * 1024:
                 self.stop("Ausgabelimit erreicht. Lauf beendet.")
                 return
-            self.status.emit("Lokale Antwort läuft …")
+            self.status.emit((self.distributed['plan'].description + ' · Antwort läuft …')
+                             if self.distributed else "Lokale Antwort läuft …")
             chunk = self.decoder.decode(data)
             self.output_tail = (self.output_tail + chunk)[-128:]
             self.output.emit(chunk)
@@ -246,11 +278,27 @@ class LocalRunner(QObject):
     def _read_diagnostics(self, proc):
         data = bytes(proc.readAllStandardError())
         if proc is self.process and self.phase == "generate":
+            if self.distributed:
+                lines = (self.diagnostic_tail + data.decode('utf-8', errors='replace')).split('\n')
+                self.diagnostic_tail = lines.pop()[-2048:]
+                for line in lines:
+                    match = re.search(r'layer\s+(\d+) assigned to device ([^\s,]+)', line)
+                    if match:
+                        self.assignment[int(match[1])] = match[2]
             recent = self.diagnostics + data
             self.diagnostics[:] = recent[-8192:]
             if b"input too long: skipped" in recent or b"prompt is too long" in recent:
                 self.input_truncated = True
                 self.stop("Der Kontext reicht für diese Eingabe nicht aus. Kürze den Verlauf oder erhöhe die Kontextgröße.")
+
+    def assignment_valid(self):
+        config = self.distributed
+        if not config or 'plan' not in config:
+            return False
+        count = config['layers']
+        return (set(self.assignment) == set(range(count))
+                and set(self.assignment.values()) == {config['local']['device'], config['remote_device']}
+                and any(self.assignment.get(i) == config['remote_device'] for i in range(count - 1)))
 
     def _load_error(self):
         log = self.diagnostics.lower()
@@ -290,14 +338,45 @@ class LocalRunner(QObject):
                 valid = code == 0 and proof.get("header_ok") is True
                 error = GGUF_ERRORS.get(proof.get("error"))
                 self.thinking_prefilled = proof.get("thinking_prefilled") is True
+                dimensions = (proof.get('layers'), proof.get('embedding'))
             except (ValueError, AttributeError, TypeError):
                 valid, error = False, None
             self.proof.clear()
             if not valid:
                 self._finish(error or "Die App konnte die Modellprüfung nicht abschließen. Prüfe den installierten Build.")
             else:
-                self.status.emit("Lokales Modell wird geladen …")
-                self._spawn("generate", *self._runtime_command())
+                if self.distributed:
+                    if any(type(value) is not int for value in dimensions):
+                        self._finish('Diese Modellarchitektur liefert keine prüfbaren Layer-Metadaten für die Verteilung.')
+                        return
+                    self.distributed.update(layers=dimensions[0] + 1, embedding=dimensions[1])
+                    self.status.emit('GPU-Speicher beider Geräte und RPC-Verbindung werden geprüft …')
+                    self._spawn('devices', str(self.runtime), ['--offline', '--rpc', self.distributed['endpoint'], '--list-devices'])
+                else:
+                    self.status.emit("Lokales Modell wird geladen …")
+                    self._spawn("generate", *self._runtime_command())
+        elif self.phase == 'devices':
+            from .compute_plan import devices, plan_layers
+            try:
+                if code or status != QProcess.ExitStatus.NormalExit:
+                    raise ValueError('RPC-Geräteprüfung fehlgeschlagen. Auf beiden Geräten neu vorbereiten.')
+                found = devices(self.proof.decode('utf-8', errors='replace'))
+                config = self.distributed
+                local = next(d for d in found if d['device'] == config['local']['device'])
+                remote = next(d for d in found if d['device'].startswith('RPC'))
+                config['local']['free'] = local['free']
+                config['remote']['free'] = remote['free']
+                config['remote_device'] = remote['device']
+                config['plan'] = plan_layers(config['local'], config['remote'], size=config['size'],
+                                            layers=config['layers'], embedding=config['embedding'],
+                                            context=self.model_setting(self.model, 'context'))
+                self.proof.clear()
+                self.status.emit(config['plan'].description + ' · Gewichte werden verteilt …')
+                self._spawn('generate', *self._runtime_command())
+            except (ValueError, StopIteration) as error:
+                self._finish(str(error) if isinstance(error, ValueError) else 'Lokale oder entfernte GPU fehlt. Kein Solo-Fallback.')
+        elif self.distributed and not self.assignment_valid():
+            self._finish('Beide GPUs konnten nicht als Modell-Rechengeräte nachgewiesen werden. Kein Solo-Fallback.')
         elif code != 0 or status != QProcess.ExitStatus.NormalExit:
             self._finish(self._load_error())
         else:
@@ -309,7 +388,8 @@ class LocalRunner(QObject):
             elif not self.output_tail.rstrip().endswith("[end of text]"):
                 self._finish("Die Ausgabe endete vorzeitig. Die Antwort kann abgeschnitten sein.")
             else:
-                self._finish("Lokaler Lauf beendet.")
+                self._finish((self.distributed['plan'].description + ' · Gemeinsamer Lauf beendet; beide GPUs zugewiesen.')
+                             if self.distributed else "Lokaler Lauf beendet.")
 
     def stop(self, reason="Gestoppt. Eingabe bleibt für einen manuellen Neustart erhalten."):
         if not self.busy or self.stop_reason:
@@ -328,7 +408,9 @@ class LocalRunner(QObject):
         self.prompt = ""
         self.proof.clear()
         self.diagnostics.clear()
+        self.pending_output.clear()
         self.busy = False
+        self.distributed = None
         self.busy_changed.emit(False)
         self.status.emit(message)
         self.finished.emit(message)

@@ -15,6 +15,7 @@ from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
 from .local_model import LocalRunner
 from .model_settings import ModelSettings
 from .device_pairing import DevicePairingPage
+from .distributed import DistributedSession
 from .integrations import IntegrationStore, SkillEditor, McpPanel
 from .chat_output import split_reply
 from .chat_transcript import ChatTranscript
@@ -186,7 +187,7 @@ class Workspace(QMainWindow):
             action.setProperty('quiet', True)
         self.send = self.button('Senden', self.submit, composer)
         self.send.setProperty('primary', True)
-        self.stop = self.button('Stoppen', lambda: self.runner.stop('Antwort gestoppt.'), composer)
+        self.stop = self.button('Stoppen', self.stop_run, composer)
         entry.addLayout(composer)
         composer_row = QHBoxLayout()
         composer_row.addStretch()
@@ -198,6 +199,21 @@ class Workspace(QMainWindow):
         self.devices.resize(820, 760)
         device_layout = QVBoxLayout(self.devices)
         self.pairing = DevicePairingPage(self.runner)
+        self.cluster = DistributedSession(self.runner, self.pairing)
+        self.compute_hint = QLabel('Experimentelle gemeinsame Inferenz: nur eigene Geräte und Testdaten. '
+                                   'Auf beiden Geräten aktivieren. Der Kurztest ermittelt GPU-Leistung; '
+                                   'WLAN kann die gemeinsame Berechnung verlangsamen.')
+        self.compute_hint.setWordWrap(True)
+        self.compute_status = QLabel(self.cluster.message)
+        self.compute_status.setTextFormat(Qt.TextFormat.PlainText)
+        self.compute_status.setWordWrap(True)
+        self.compute_enable = QPushButton('Gemeinsames Rechnen aktivieren')
+        self.compute_enable.clicked.connect(self.cluster.enable)
+        self.compute_disable = QPushButton('Gemeinsames Rechnen beenden')
+        self.compute_disable.clicked.connect(lambda: self.cluster.disable())
+        for widget in (self.compute_hint, self.compute_status, self.compute_enable, self.compute_disable):
+            self.pairing.layout().addWidget(widget)
+        self.cluster.changed.connect(self.compute_changed)
         device_scroll = QScrollArea()
         device_scroll.setWidgetResizable(True)
         device_scroll.setWidget(self.pairing)
@@ -341,6 +357,8 @@ class Workspace(QMainWindow):
         self.prompt.setFocus()
 
     def device_mode_status(self):
+        if self.cluster.ready:
+            return 'Beide Geräte bereit · Lastverteilung automatisch'
         if self.pairing.connected:
             return 'Geräte verbunden · Modellabgleich im Gerätefenster'
         return 'Gerätemodus · Verbinde ein Gerät, um die Modelle abzugleichen.'
@@ -363,7 +381,7 @@ class Workspace(QMainWindow):
         self.was_connected = connected
 
     def submit(self):
-        if self.runner.busy or not self.local_mode.isChecked():
+        if self.runner.busy or self.runner.external_busy:
             return
         text = self.prompt.toPlainText().strip()
         if not text:
@@ -381,7 +399,8 @@ class Workspace(QMainWindow):
         self.messages.extend([{'role': 'user', 'text': text},
                               {'role': 'assistant', 'text': '', 'thinking': '', 'pending': True}])
         self.stream = []
-        if not self.runner.start(prompt):
+        start = self.runner.start if self.local_mode.isChecked() else self.cluster.start
+        if not start(prompt):
             del self.messages[-2:]
             self.stream = None
             return
@@ -433,19 +452,37 @@ class Workspace(QMainWindow):
         self.finish_close()
 
     def refresh(self, *_):
-        busy = self.runner.busy
+        busy = self.runner.busy or self.runner.external_busy
         for widget in (self.tree, self.new_project, self.new_chat, self.delete_chat, self.models, self.skill_button, self.mcp_button, self.mode):
             widget.setEnabled(not busy)
         local = self.local_mode.isChecked()
         self.device_chat_notice.setVisible(not local)
         self.prompt.setReadOnly(busy)
-        self.prompt.setPlaceholderText('Nachricht schreiben …' if local else 'Entwurf für den Einzelgerät-Modus …')
-        can_send = (not busy and local
+        self.prompt.setPlaceholderText('Nachricht schreiben …')
+        self.device_chat_hint.setText('Automatische Lastverteilung · beide Geräte rechnen.' if self.cluster.ready
+                                     else self.cluster.message)
+        can_send = (not busy and (local or self.cluster.ready)
                     and bool(self.prompt.toPlainText().strip()) and not self.runner.unavailable_reason())
         self.send.setEnabled(can_send)
-        self.send.setToolTip('' if local else 'Zum Chatten Einzelgerät wählen.')
+        self.send.setToolTip('' if local or self.cluster.ready else 'Gemeinsames Rechnen auf beiden Geräten aktivieren.')
         self.stop.setVisible(busy)
-        self.send.setVisible(not busy and local)
+        self.send.setVisible(not busy)
+
+    def compute_changed(self):
+        self.compute_status.setText(self.cluster.message)
+        self.compute_enable.setEnabled(not self.cluster.enabled and not self.cluster.busy and not self.runner.busy)
+        self.compute_disable.setEnabled(self.cluster.enabled)
+        self.runner.busy_changed.emit(self.runner.busy or self.runner.external_busy)
+        self.refresh()
+        self.finish_close()
+
+    def stop_run(self):
+        if self.cluster.pending or self.cluster.reservation:
+            self.cluster.cancel()
+        elif self.runner.external_busy:
+            self.cluster.disable()
+        else:
+            self.runner.stop('Antwort gestoppt.')
 
     def copy_answer(self):
         for message in reversed(self.messages):
@@ -604,8 +641,9 @@ class Workspace(QMainWindow):
         self.advanced.raise_()
 
     def closeEvent(self, event):
-        if self.runner.busy or self.pairing.busy or self.mcp_panel.connection:
+        if self.runner.busy or self.pairing.busy or self.mcp_panel.connection or self.cluster.busy:
             self.closing = True
+            self.cluster.disable()
             self.runner.stop()
             self.pairing.close_session()
             self.mcp_panel.disconnect()
@@ -621,5 +659,5 @@ class Workspace(QMainWindow):
         event.accept()
 
     def finish_close(self, *_):
-        if self.closing and not self.runner.busy and not self.pairing.busy and not self.mcp_panel.connection:
+        if self.closing and not self.runner.busy and not self.pairing.busy and not self.mcp_panel.connection and not self.cluster.busy:
             self.close()

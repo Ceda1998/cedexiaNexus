@@ -105,8 +105,10 @@ def read_metadata(stream, size, fields, *, stop_when_found=False):
                 if length > min(262144, size - stream.tell()):
                     raise ValueError("invalid GGUF metadata text")
                 values[key] = stream.read(length)
+            elif kind in (2, 4):
+                values[key], = read("<H" if kind == 2 else "<I")
             else:
-                values[key], = read("<H")
+                raise ValueError("unsupported requested GGUF scalar")
             if stop_when_found and len(values) == len(fields):
                 break
         elif kind == 9:
@@ -120,6 +122,17 @@ def read_metadata(stream, size, fields, *, stop_when_found=False):
 def split_metadata(stream, size):
     fields = read_metadata(stream, size, {b"split.no": 2, b"split.count": 2})
     return fields.get(b"split.no", 0), fields.get(b"split.count", 1)
+
+
+def model_dimensions(path):
+    with path.open('rb') as stream:
+        size = os.fstat(stream.fileno()).st_size
+        fields = read_metadata(stream, size, {b'general.architecture': 8}, stop_when_found=True)
+        arch = fields[b'general.architecture']
+        stream.seek(0)
+        keys = (arch + b'.block_count', arch + b'.embedding_length')
+        values = read_metadata(stream, size, dict.fromkeys(keys, 4), stop_when_found=True)
+        return {'layers': values[keys[0]], 'embedding': values[keys[1]]}
 
 
 def completion_prefills_thinking(path):
@@ -190,6 +203,10 @@ def main(argv=None):
             result = {"header_ok": error is None, "error": error}
             if args.chat_format and error is None:
                 result["thinking_prefilled"] = completion_prefills_thinking(args.model)
+                try:
+                    result.update(model_dimensions(args.model))
+                except (OSError, ValueError, KeyError):
+                    pass  # Local inference can support architectures without these fields.
         else:
             manifest = json.loads(args.manifest.read_text(encoding="utf-8"))
             result = verify(args.model, manifest)

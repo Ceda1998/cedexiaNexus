@@ -4,7 +4,8 @@ Der Mac soll das verifizierte Modell laden und über Metal rechnen. Der
 Windows-PC stellt seine CUDA-GPU als Worker bereit. Beide Prozesse verwenden
 llama.cpp-Revision `8ca5a8008b57aa39f2601546c0d07912045080a5`. Deren
 RPC-Header definiert Protokoll **10.0.0**. Der erste Test verwendet TCP.
-Das RPC-Backend bleibt getrennt von der Desktop-App und den Solo-Builds.
+Der hier beschriebene manuelle Spike bleibt von den Solo-Builds getrennt.
+Ab 0.1.71 integriert NX-011 einen eigenen [geschützten Desktop-Pfad](distributed-chat.md).
 
 ## Builds vorbereiten
 

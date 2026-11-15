@@ -90,6 +90,8 @@ def compare_models(local, peer):
 
 class DevicePairingPage(QWidget):
     idle = Signal()
+    compute_message = Signal(dict)
+    state_changed = Signal()
     discovery_failure = "Geräteerkennung fehlgeschlagen. Prüfe das lokale Netzwerk oder verwende einen Einladungscode."
 
     def __init__(self, runner):
@@ -552,6 +554,9 @@ class DevicePairingPage(QWidget):
     def receive_message(self, message):
         if not self.connected:
             return
+        if message['type'] == 'compute':
+            self.compute_message.emit(message)
+            return
         if message["type"] == "model":
             if self.peer_model is None or self.peer_model.get("sha256") != message.get("sha256"):
                 self.received_source = ""
@@ -574,6 +579,7 @@ class DevicePairingPage(QWidget):
                 self.status.setText("Browser konnte nicht geöffnet werden. Kopiere den Link aus dem Downloadhinweis.")
 
     def refresh(self):
+        self.state_changed.emit()
         active = self.thread is not None
         has_address = bool(self.interfaces.currentData())
         self.connection_type.setEnabled(not active)

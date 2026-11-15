@@ -28,8 +28,8 @@ ARCHIVES = {
     "cudart-llama-bin-win-cuda-13.5-x64.zip": "c2bf4cc202bfbaaa7a0b75f5082457c3811326947bb216059b72839d844e9cba",
 }
 RUNTIME_FILE = re.compile(
-    r"llama-completion\.exe|llama(?:-common|-completion-impl)?\.dll|"
-    r"ggml(?:-base|-cuda|-cpu(?:-[\w-]+)?)?\.dll|"
+    r"(?:llama-completion|llama-bench|ggml-rpc-server)\.exe|llama(?:-common|-completion-impl|-bench-impl)?\.dll|"
+    r"ggml(?:-base|-cuda|-rpc|-cpu(?:-[\w-]+)?)?\.dll|"
     r"(?:cudart|cublas|cublasLt)64_\d+\.dll|libomp\.dll|LICENSE-LLVM-OpenMP", re.IGNORECASE,
 )
 OPENMP_LICENSE = "LICENSE-LLVM-OpenMP"
@@ -74,7 +74,7 @@ def stage_runtime(runtime):
                     continue
                 with bundle.open(entry) as source, (runtime / filename).open("xb") as target:
                     shutil.copyfileobj(source, target)
-    required = ("llama-completion.exe", "llama.dll", "ggml.dll", "ggml-base.dll",
+    required = ("llama-completion.exe", "llama-bench.exe", "ggml-rpc-server.exe", "ggml-rpc.dll", "llama.dll", "ggml.dll", "ggml-base.dll",
                 "ggml-cuda.dll", "libomp.dll", OPENMP_LICENSE)
     for name in required:
         if not (runtime / name).is_file():
@@ -99,6 +99,8 @@ def stage_runtime(runtime):
     if not commit or not REVISION.startswith(commit[1]):
         raise ValueError("The runtime does not report the pinned llama.cpp revision.")
     subprocess.run([str(launcher), "--offline", "--list-devices"], cwd=runtime, check=True, timeout=30)
+    for name in ('llama-bench.exe', 'ggml-rpc-server.exe'):
+        subprocess.run([str(runtime / name), '--help'], cwd=runtime, check=True, timeout=30)
 
 
 def smoke_package(executable=None, work=None):

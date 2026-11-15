@@ -53,8 +53,9 @@ Audioaufnahme oder Transkriptionsruntime ist noch offen.
 Im Mehrgeräte-Modus öffnet **Geräte verbinden …** den Kopplungsdialog.
 Nach der Verbindung erscheint wieder das Chatfenster. Für eine lokale Antwort
 **Zu Einzelgerät wechseln** am Eingabefeld wählen. Der Entwurf und die
-bestehende Kopplung bleiben dabei erhalten. Gemeinsames Senden hängt von
-der Inferenz aus NX-011 ab. Die bisherigen Modellprüfungen
+bestehende Kopplung bleiben dabei erhalten. Ab Version 0.1.71 ermöglicht
+**Gemeinsames Rechnen aktivieren** auf beiden Geräten den experimentellen
+[gemeinsamen Chat mit automatischer Lastverteilung](distributed-chat.md). Die bisherigen Modellprüfungen
 und Demoansichten bleiben unter den erweiterten Einstellungen erreichbar.
 Der Zwei-Fenster-Kopplungstest und die bisherigen Runtime-Tests bleiben aktiv.
 
@@ -159,8 +160,9 @@ Namen sind bei identischem Inhalt möglich. Der Status beschreibt die geprüften
 Dateien zum Zeitpunkt des Abgleichs. Fehlt eine ausgewählte Datei am
 gespeicherten Ort, zeigt das Gerätefenster ihren Namen und das betroffene Gerät.
 Dort die Datei erneut auswählen oder am gespeicherten Ort wiederherstellen und
-**Gewichte erneut prüfen** wählen. Die Geräteansicht startet keinen
-Inferenzauftrag. Gemeinsame Modellberechnung wird separat in NX-011 geprüft.
+**Gewichte erneut prüfen** wählen. Der Gewichte-Abgleich allein startet keinen
+Inferenzauftrag. Die separate Freigabe **Gemeinsames Rechnen aktivieren**
+und der [Mehrgeräte-Chat](distributed-chat.md) gehören zu NX-011.
 Die Verbindung nutzt die gewählte private IPv4-Adresse auf beiden Geräten.
 Gast-WLANs mit Client-Isolation, getrennte Netzsegmente und Host-Firewalls
 können die Verbindung blockieren. Die Suche verwendet Multicast im gleichen
