@@ -240,7 +240,7 @@ class ComputeQtTests(unittest.TestCase):
                         try:
                             client.sendall(b'not authorized')
                             self.assertEqual(client.recv(32), b'')
-                        except ConnectionResetError:
+                        except (ConnectionResetError, ConnectionAbortedError):
                             pass
                 server.allowed.clear()
         finally:
