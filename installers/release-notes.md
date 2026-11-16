@@ -1,4 +1,25 @@
-**0.1.72 · Rechenfreigabe und Verbindungsdiagnose**
+**0.1.73 · Chatkomfort, Anhänge und Befehlsfreigaben**
+
+Projekte mit ihren Chats löschen, neuer Chat per Icon, animierte Sidebar,
+Standardmodell und Allgemein-Einstellungen mit Version sowie Deutsch/Englisch.
+Antworten haben ein Kopiericon direkt am Text. Thinking ist standardmäßig
+zugeklappt; Ministrals spezielle Trennmarkierungen werden jetzt korrekt erkannt.
+Dunkle Bedienelemente und Dropdowns sind besser lesbar.
+
+Das Plus-Icon fügt lokale Dateien hinzu. Text und PDFs werden begrenzt als Kontext
+ausgelesen; Bilder können angehängt, von dieser Text-Runtime aber noch nicht
+analysiert werden. Das steht direkt am Anhang. Kein automatischer Upload.
+
+Das Schild-Icon steuert Terminal- und MCP-Freigaben: Aus, Einzelfreigabe (Standard),
+experimentelle lokale Agent-Prüfung und Auto. Das lokale Terminal zeigt Befehl,
+Arbeitsordner, Ausgabe und Exit-Code; normale Benutzerrechte, Zeit-/Ausgabelimit.
+Agent-Prüfung ist keine Sandbox. Shell-Code aus Antworten lässt sich ins Terminal
+übernehmen und erst nach explizitem Ausführen prüfen. Kein autonomer Werkzeug-Loop.
+
+99 Tests auf dem Mac bestanden; echter Ministral-Metal-Test mit getrennter
+finaler Antwort erfolgreich. [Bedienung und Grenzen](https://github.com/Ceda1998/cedexiaNexus/blob/main/docs/chat-workspace.md).
+
+**Weiterhin enthalten: Rechenfreigabe und Verbindungsdiagnose aus 0.1.72**
 
 Beide Geräte aktualisieren und neu koppeln. Die Rechenfähigkeit wird jetzt vor der Aktivierung innerhalb von TLS ausgehandelt. Ein älterer Peer bleibt für den Gewichte-Abgleich verbunden und erhält auf der neuen App einen klaren Updatehinweis. Abgelehnte Rechennachrichten beenden die Rechenfreigabe, nicht die Kopplung. Chat und Gerätefenster zeigen, welches Gerät noch nicht bereit ist; echte Verbindungsabbrüche erhalten bereinigte Fehlercodes.
 
