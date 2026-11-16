@@ -9,6 +9,13 @@
     "player-play.svg": "9c30092ecfea4578ecf2669269ce4334a24d82667e61fabba7f6c552447d1c77",
     "player-stop.svg": "19c9bcbec8fd318c9abae0bab6d9d73bd7df8e15b52fc62b329faf9a1281e4e7",
     "settings.svg": "98f10cef0571a9bbaf954c8a5d368107c247215fad68bc62a6b2c7dfc0e29642",
-    "alert-triangle.svg": "831c9ac434a14b8e8855775810cd971cff0457330010a4c3c81f74233dbee5ff"
+    "alert-triangle.svg": "831c9ac434a14b8e8855775810cd971cff0457330010a4c3c81f74233dbee5ff",
+    "plus.svg": "5c22bc4601782a1aba6f67a6a97fbb864c6cf75a4aa1f012ae3f8478d1b128d2",
+    "layout-sidebar.svg": "890bc249254f2b8d211692fe4320b073b13debf7cc5eb7d95ec2f80f06f17032",
+    "message-plus.svg": "6b48eeee334ad6a4d38f75e536c4776be2c740193cfce8d259384cde270b6e57",
+    "copy.svg": "132cf3188f6f7b9c4f44c4fcf937c026dd7eea19cb8e4670c125863b904ec29d",
+    "shield-check.svg": "ade5f9893708ae05f702a700ab45dc87786c48073514130c6f9bfad640ecf8a4",
+    "chevron-down.svg": "a095650d385a333f147922ac05374bc17a5014bc1249f06d98f7114330b28a21",
+    "x.svg": "f443b1f763bd3dc0f867c0a6d721b6e1f5ef79a6886e67d937ec05c60b170e16"
   }
 }

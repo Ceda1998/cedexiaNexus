@@ -96,3 +96,9 @@ enthalten keine Gewichte und belegen keine
 Windows-GPU-Inferenz oder verteilte Modellberechnung. Installer auf dem physischen
 Windows-Zielgerät und Gatekeeper/SmartScreen auf frischen Downloads sind separat
 abzunehmen.
+
+Ab 0.1.73 zeigt **Einstellungen → Allgemein** ebenfalls Version und Kurz-Commit.
+Beide Pakete enthalten Qt PDF für lokale Textextraktion. Der Paket-Smoke-Test
+lädt auch dieses Modul. Es werden weiterhin keine Modelle, OCR-/Vision-Gewichte
+oder fremden MCP-Server automatisch installiert. Die neue Terminalfunktion
+verwendet die vorhandene Betriebssystem-Shell mit Benutzerrechten.

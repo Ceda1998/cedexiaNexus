@@ -59,7 +59,8 @@ class LocalRunner(QObject):
         default_model = model_dir / "models/Qwen3.8-27B-Q4_K_M.gguf"
         if not self.settings.contains("local_model_paths") and not self.models and default_model.is_file():
             self.models.append(str(default_model))
-        self.model = Path(saved_model or self.models[0]) if self.models else None
+        preferred = self.settings.value('default_model_path', '', type=str)
+        self.model = Path(preferred if preferred in self.models else saved_model or self.models[0]) if self.models else None
         self.busy = False
         self.external_busy = False
         self.distributed = None
@@ -125,10 +126,22 @@ class LocalRunner(QObject):
         if self.busy or self.external_busy or str(path) not in self.models:
             return
         self.models.remove(str(path))
+        if self.settings.value('default_model_path', '') == str(path):
+            self.settings.remove('default_model_path')
         self.settings.setValue("local_model_paths", self.models)
         if self.model == path:
             self.select_model(self.models[0] if self.models else "")
         self.library_changed.emit()
+
+    def set_default_model(self, path):
+        if not (self.busy or self.external_busy) and str(path) in self.models:
+            self.settings.setValue('default_model_path', str(path))
+            self.library_changed.emit()
+
+    def select_default_model(self):
+        path = self.settings.value('default_model_path', '', type=str)
+        if path in self.models:
+            self.select_model(path)
 
     def model_setting_key(self, path, key):
         identifier = hashlib.sha256(os.fsencode(os.path.normcase(str(path)))).hexdigest()
@@ -192,7 +205,7 @@ class LocalRunner(QObject):
             "--batch-size", "128", "--ubatch-size", "128", "--threads", "4",
             "--predict", predict, "--seed", "42", "--temp", "0", "--jinja",
             "--conversation", "--single-turn", "--reasoning", reasoning,
-            "--no-display-prompt", "--no-context-shift", "--color", "off", *input_args,
+            "--no-display-prompt", "--special", "--no-context-shift", "--color", "off", *input_args,
         ]
         if self.distributed:
             config = self.distributed

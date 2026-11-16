@@ -4,6 +4,8 @@ import json
 import sys
 from urllib.parse import quote
 
+from .i18n import t
+
 from PySide6.QtCore import QProcess, QTimer, Qt, QUrl, Signal
 from PySide6.QtGui import QDesktopServices, QTextOption
 from PySide6.QtNetwork import QNetworkInterface
@@ -74,18 +76,18 @@ def same_weights(local, peer):
 
 def compare_models(local, peer):
     if peer is None:
-        return "Warte auf den Modellstatus des zweiten Geräts."
+        return t("Warte auf den Modellstatus des zweiten Geräts.")
     if "checking" in (local["state"], peer["state"]):
-        return "GGUF-Gewichte werden im Hintergrund geprüft."
+        return t("GGUF-Gewichte werden im Hintergrund geprüft.")
     if local["state"] != "ready" and peer["state"] != "ready":
-        return "Auf beiden Geräten fehlt ein prüfbares GGUF-Modell."
+        return t("Auf beiden Geräten fehlt ein prüfbares GGUF-Modell.")
     if local["state"] != "ready":
-        return "Dieses Gerät kann sein GGUF-Modell nicht prüfen."
+        return t("Dieses Gerät kann sein GGUF-Modell nicht prüfen.")
     if peer["state"] != "ready":
-        return "Das zweite Gerät kann sein GGUF-Modell nicht prüfen."
+        return t("Das zweite Gerät kann sein GGUF-Modell nicht prüfen.")
     if same_weights(local, peer):
-        return "Identische GGUF-Gewichte auf beiden Geräten."
-    return "Die ausgewählten GGUF-Gewichte unterscheiden sich."
+        return t("Identische GGUF-Gewichte auf beiden Geräten.")
+    return t("Die ausgewählten GGUF-Gewichte unterscheiden sich.")
 
 
 class DevicePairingPage(QWidget):
@@ -123,73 +125,73 @@ class DevicePairingPage(QWidget):
         self.probe_timeout.timeout.connect(self.probe.kill)
 
         layout = QVBoxLayout(self)
-        layout.addWidget(plain_label("Geräte verbinden", "title"))
+        layout.addWidget(plain_label(t("Geräte verbinden"), "title"))
         layout.addWidget(plain_label(
-            "Verbinde beide Geräte mit demselben lokalen Netz über Ethernet oder WLAN. "
-            "Wähle auf jedem Gerät seine Netzwerkverbindung."
+            t("Verbinde beide Geräte mit demselben lokalen Netz über Ethernet oder WLAN. "
+            "Wähle auf jedem Gerät seine Netzwerkverbindung.")
         ))
-        self.status = plain_label("Eine Einladung erstellen oder eine erhaltene Einladung einfügen.", "banner")
+        self.status = plain_label(t("Eine Einladung erstellen oder eine erhaltene Einladung einfügen."), "banner")
         layout.addWidget(self.status)
 
         form = QFormLayout()
         self.connection_type = QComboBox()
-        self.connection_type.setAccessibleName("Netzwerkverbindung")
+        self.connection_type.setAccessibleName(t("Netzwerkverbindung"))
         for _, label in CONNECTION_TYPES:
             self.connection_type.addItem(label)
         self.connection_type.setCurrentIndex(-1)
-        form.addRow("Verbindung", self.connection_type)
+        form.addRow(t("Verbindung"), self.connection_type)
         self.interfaces = QComboBox()
-        self.interfaces.setAccessibleName("Lokale Netzwerkadresse")
+        self.interfaces.setAccessibleName(t("Lokale Netzwerkadresse"))
         self.interfaces.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon)
         self.interfaces.setMinimumContentsLength(14)
         self.network_hint = plain_label("")
         self.wifi_name = plain_label("")
         self.wifi_names = {}
         self.location_manager = None
-        self.host = action("Einladung erstellen", self.start_host)
-        self.reload = action("Aktualisieren", self.reload_interfaces)
-        self.reload.setToolTip("Netzwerkadapter neu einlesen")
+        self.host = action(t("Einladung erstellen"), self.start_host)
+        self.reload = action(t("Aktualisieren"), self.reload_interfaces)
+        self.reload.setToolTip(t("Netzwerkadapter neu einlesen"))
         host_row = QHBoxLayout()
         host_row.addWidget(self.interfaces, 1)
         host_row.addWidget(self.reload)
         form.addRow("Adapter", host_row)
         form.addRow(self.wifi_name)
-        self.read_wifi = action("WLAN-Namen freigeben …", self.request_wifi_name)
+        self.read_wifi = action(t("WLAN-Namen freigeben …"), self.request_wifi_name)
         form.addRow(self.read_wifi)
         form.addRow(self.network_hint)
-        self.search = action("Geräte im Netz suchen", self.start_discovery)
+        self.search = action(t("Geräte im Netz suchen"), self.start_discovery)
         self.peers = QComboBox()
-        self.peers.setAccessibleName("Cedexia-Geräte im lokalen Netz")
-        self.peers.setPlaceholderText("Noch kein anderes Gerät gefunden")
-        self.request = action("Kopplung anfragen", self.request_pairing)
+        self.peers.setAccessibleName(t("Cedexia-Geräte im lokalen Netz"))
+        self.peers.setPlaceholderText(t("Noch kein anderes Gerät gefunden"))
+        self.request = action(t("Kopplung anfragen"), self.request_pairing)
         peer_row = QHBoxLayout()
         peer_row.addWidget(self.peers, 1)
         peer_row.addWidget(self.request)
         self.approval_code = plain_label("", "banner")
-        self.accept = action("Code stimmt überein", lambda: self.approve(True))
-        self.decline = action("Ablehnen", lambda: self.approve(False))
+        self.accept = action(t("Code stimmt überein"), lambda: self.approve(True))
+        self.decline = action(t("Ablehnen"), lambda: self.approve(False))
         approval_row = QHBoxLayout()
         approval_row.addWidget(self.accept)
         approval_row.addWidget(self.decline)
         form.addRow(self.search)
-        form.addRow("Gefundene Geräte", peer_row)
+        form.addRow(t("Gefundene Geräte"), peer_row)
         form.addRow(self.approval_code)
         form.addRow(approval_row)
         form.addRow(self.host)
         self.code = QLineEdit()
         self.code.setMaxLength(128)
-        self.code.setAccessibleName("Einladungscode")
-        self.code.setPlaceholderText("Code vom einladenden Gerät")
+        self.code.setAccessibleName(t("Einladungscode"))
+        self.code.setPlaceholderText(t("Code vom einladenden Gerät"))
         self.code.setEchoMode(QLineEdit.EchoMode.Password)
-        self.reveal_code = QPushButton("Code anzeigen")
+        self.reveal_code = QPushButton(t("Code anzeigen"))
         self.reveal_code.setCheckable(True)
         self.reveal_code.toggled.connect(self.show_invitation_code)
-        self.copy = action("Code kopieren", self.copy_invitation)
-        self.join = action("Beitreten", self.start_join)
+        self.copy = action(t("Code kopieren"), self.copy_invitation)
+        self.join = action(t("Beitreten"), self.start_join)
         code_row = QHBoxLayout()
         code_row.addWidget(self.code, 1)
         code_row.addWidget(self.join)
-        form.addRow("Einladungscode", code_row)
+        form.addRow(t("Einladungscode"), code_row)
         self.code_preview = QPlainTextEdit()
         self.code_preview.setAccessibleName("Sichtbarer Einladungscode")
         self.code_preview.setReadOnly(True)
@@ -203,7 +205,7 @@ class DevicePairingPage(QWidget):
         code_actions.addStretch()
         form.addRow("", code_actions)
         layout.addLayout(form)
-        self.disconnect = action("Trennen", self.close_session)
+        self.disconnect = action(t("Trennen"), self.close_session)
         layout.addWidget(self.disconnect)
 
         self.comparison = plain_label("", "banner")
@@ -212,20 +214,20 @@ class DevicePairingPage(QWidget):
         for widget in (self.comparison, self.selected, self.remote):
             layout.addWidget(widget)
         model_row = QHBoxLayout()
-        self.select = QPushButton("Lokales Modell auswählen …")
-        self.recheck = action("Gewichte erneut prüfen", self.check_model)
+        self.select = QPushButton(t("Lokales Modell auswählen …"))
+        self.recheck = action(t("Gewichte erneut prüfen"), self.check_model)
         model_row.addWidget(self.select)
         model_row.addWidget(self.recheck)
         layout.addLayout(model_row)
 
         self.source = QLineEdit()
         self.source.setMaxLength(1600)
-        self.source.setAccessibleName("HTTPS-Bezugsquelle für dieses GGUF")
-        self.source.setPlaceholderText("HTTPS-Bezugsquelle für genau diese GGUF-Datei")
+        self.source.setAccessibleName(t("HTTPS-Bezugsquelle für dieses GGUF"))
+        self.source.setPlaceholderText(t("HTTPS-Bezugsquelle für genau diese GGUF-Datei"))
         self.share = action("Downloadhinweis senden", self.send_source)
         self.notice = plain_label("")
         self.notice.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
-        self.open_source = action("Bezugsquelle im Browser öffnen", self.visit_source)
+        self.open_source = action(t("Bezugsquelle im Browser öffnen"), self.visit_source)
         for widget in (self.source, self.share, self.notice, self.open_source):
             layout.addWidget(widget)
         layout.addStretch()
@@ -266,7 +268,7 @@ class DevicePairingPage(QWidget):
         else:
             self.network_hint.clear()
         if kind == QNetworkInterface.InterfaceType.Wifi and self.interfaces.count() == 0:
-            self.network_hint.setText("Kein aktives WLAN erkannt. Verbinde dieses Gerät in den Systemeinstellungen mit einem WLAN und klicke dann auf „Aktualisieren“.")
+            self.network_hint.setText(t("Kein aktives WLAN erkannt. Verbinde dieses Gerät in den Systemeinstellungen mit einem WLAN und klicke dann auf „Aktualisieren“."))
         elif kind is not None and self.interfaces.count() == 0 and adapters:
             self.network_hint.setText(f"Kein Adapter für {label} erkannt. Wähle bei Bedarf „Manuelle Auswahl“.")
         self.network_hint.setVisible(bool(self.network_hint.text()))
@@ -277,7 +279,7 @@ class DevicePairingPage(QWidget):
         wifi_selected = self.connection_type.currentText() == "WLAN" and bool(self.interfaces.currentData())
         name = self.wifi_names.get(self.interfaces.currentData(), "")
         self.wifi_name.setText(f"Verbundenes WLAN: {name}" if name else
-                               "WLAN verbunden. Der Netzwerkname ist vom System nicht verfügbar.")
+                               t("WLAN verbunden. Der Netzwerkname ist vom System nicht verfügbar."))
         self.wifi_name.setVisible(wifi_selected)
         self.read_wifi.setVisible(wifi_selected and not name and sys.platform == "darwin")
 
@@ -310,7 +312,7 @@ class DevicePairingPage(QWidget):
             self.status.setText("Der Adapter hat kein nutzbares IPv4-Subnetz. Aktualisiere die Adapterliste.")
             return
         thread = PairingThread(address=address, discovery_network=self.discovery_network, parent=self)
-        self.begin(thread, hosting=True, status="Geräteerkennung wird gestartet …")
+        self.begin(thread, hosting=True, status=t("Geräteerkennung wird gestartet …"))
 
     def discovery_ready(self, port, fingerprint):
         if self.thread is None or not self.isVisible() or self.thread.cancelled.is_set():
@@ -386,7 +388,7 @@ class DevicePairingPage(QWidget):
         try:
             thread = PairingThread(code=code, source_address=address, parent=self)
         except ValueError:
-            self.status.setText("Der Einladungscode ist ungültig. Kopiere ihn erneut auf dem anderen Gerät.")
+            self.status.setText(t("Der Einladungscode ist ungültig. Kopiere ihn erneut auf dem anderen Gerät."))
             return
         self.clear_invitation()
         self.begin(thread, hosting=False)
@@ -395,7 +397,7 @@ class DevicePairingPage(QWidget):
         self.connection_failure = ''
         self.thread = thread
         self.hosting = hosting
-        self.status.setText(status or ("Einladung wird erstellt …" if hosting else "Verbindung wird aufgebaut …"))
+        self.status.setText(status or ("Einladung wird erstellt …" if hosting else t("Verbindung wird aufgebaut …")))
         thread.invitation.connect(self.invitation_ready)
         thread.advertised.connect(self.discovery_ready)
         thread.approval_requested.connect(self.show_approval)
@@ -413,18 +415,18 @@ class DevicePairingPage(QWidget):
         if self.thread is None or self.thread.cancelled.is_set():
             return
         self.code.setText(code)
-        self.status.setText("Einladungscode anzeigen oder kopieren und auf dem zweiten Gerät eingeben. Die Einladung gilt fünf Minuten.")
+        self.status.setText(t("Einladungscode anzeigen oder kopieren und auf dem zweiten Gerät eingeben. Die Einladung gilt fünf Minuten."))
         self.refresh()
 
     def show_invitation_code(self, visible):
         self.code_preview.setPlainText(self.code.text() if visible else "")
         self.code_preview.setVisible(visible)
-        self.reveal_code.setText("Code ausblenden" if visible else "Code anzeigen")
+        self.reveal_code.setText("Code ausblenden" if visible else t("Code anzeigen"))
 
     def copy_invitation(self):
         if self.copy.isEnabled():
             QApplication.clipboard().setText(self.code.text())
-            self.status.setText("Einladung kopiert. Füge sie auf dem zweiten Gerät ein.")
+            self.status.setText(t("Einladung kopiert. Füge sie auf dem zweiten Gerät ein."))
 
     def clear_invitation(self):
         code = self.code.text()
@@ -618,7 +620,7 @@ class DevicePairingPage(QWidget):
         path = self.runner.model
         local_state = self.local_model["state"]
         if path is None:
-            self.selected.setText("Dieses Gerät · Kein Modell ausgewählt.")
+            self.selected.setText(t("Dieses Gerät · Kein Modell ausgewählt."))
         elif self.connected and local_state == "missing":
             self.selected.setText(f"Dieses Gerät · {path.name} · Datei am gespeicherten Ort nicht gefunden. Wähle sie erneut aus.")
         elif local_state == "error":

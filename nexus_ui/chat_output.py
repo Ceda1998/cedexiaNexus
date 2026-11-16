@@ -4,7 +4,7 @@ import re
 
 OPEN, CLOSE = '<think>', '</think>'
 END = '[end of text]'
-MARKERS = (OPEN, CLOSE, '<|im_start|>assistant', '<|im_start|>', '<|im_end|>',
+MARKERS = (OPEN, CLOSE, '[THINK]', '[/THINK]', '</s>', '<|im_start|>assistant', '<|im_start|>', '<|im_end|>',
            '<|endoftext|>', '<|eot_id|>', '<|end_of_text|>')
 MARKER = re.compile('|'.join(map(re.escape, MARKERS)))
 FENCE = re.compile(r'^ {0,3}(`{3,}|~{3,})([^\n]*)$')
@@ -78,10 +78,10 @@ def split_reply(text, *, prefilled=False, complete=False, legacy=False, console_
         for match in MARKER.finditer(part):
             add(part[pos:match.start()])
             marker = match[0]
-            if marker == OPEN:
+            if marker in (OPEN, '[THINK]'):
                 in_thinking = True
                 saw_tag = True
-            elif marker == CLOSE:
+            elif marker in (CLOSE, '[/THINK]'):
                 # Older saved Qwen replies may only carry the closing marker.
                 if legacy and not saw_tag and not in_thinking:
                     thinking.extend(answer)
@@ -114,3 +114,17 @@ def split_reply(text, *, prefilled=False, complete=False, legacy=False, console_
             pos = literal.end()
         parse(line[pos:], last=consumed == len(text))
     return Reply(''.join(answer).lstrip('\r\n'), ''.join(thinking).strip(), in_thinking)
+
+
+def shell_blocks(text):
+    """Offer explicit terminal handoff only for shell-labelled Markdown fences."""
+    block, shell = [], False
+    for line, kind in fenced_lines(text):
+        if kind == 'open':
+            language = FENCE.fullmatch(line.rstrip('\r\n'))[2].strip().lower()
+            shell = language in ('sh', 'bash', 'shell', 'zsh', 'powershell', 'pwsh', 'ps1')
+            block = []
+        elif kind == 'code':
+            block.append(line)
+        elif kind == 'close' and shell and block:
+            yield ''.join(block)

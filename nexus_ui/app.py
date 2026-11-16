@@ -353,6 +353,7 @@ def make_application():
             loaded.extend(QFontDatabase.applicationFontFamilies(font_id))
     if loaded:
         app.setFont(QFont(loaded[0], 11))
+    app.setStyle("Fusion")
     app.setStyleSheet(STYLE)
     return app, bool(loaded)
 
@@ -361,6 +362,8 @@ def main(smoke=False):
     app, font_loaded = make_application()
     if smoke:
         host_context()
+        from PySide6.QtPdf import QPdfDocument
+        QPdfDocument()
         from mcp import Client
         Client('https://example.invalid/mcp')
     from .workspace import Workspace
@@ -380,7 +383,7 @@ def main(smoke=False):
             from CoreLocation import CLLocationManager
             from CoreWLAN import CWWiFiClient
             assert CLLocationManager and CWWiFiClient
-        if window.local_mode.text() != 'Einzelgerät' or window.multi_mode.text() != 'Mehrgeräte':
+        if len(window.mode_buttons.buttons()) != 2 or not window.new_chat.icon().availableSizes():
             raise RuntimeError('The installed workspace is missing the current mode controls.')
         if window.pairing.connection_type.findText('WLAN') < 0:
             raise RuntimeError('The installed workspace is missing the WLAN option.')

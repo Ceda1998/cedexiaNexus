@@ -15,7 +15,9 @@ Sie enthalten App und Laufzeiten, aber keine GGUF-Modelle.
 
 Die Desktop-App startet mit Projekten und Chats, einklappbarer Sidebar,
 Moduswahl und separaten Einstellungen. Der lokale Composer verwendet die
-vorhandene Runtime. [Bedienung und Funktionsstand](docs/desktop.md#projekt--und-chatoberfläche).
+vorhandene Runtime. NX-067 ergänzt Projektlöschung, Dateianhänge,
+Befehlsfreigaben, Deutsch/Englisch und ein Standardmodell.
+[Chat-Komfort und Grenzen](docs/chat-workspace.md). [Bedienung und Funktionsstand](docs/desktop.md#projekt--und-chatoberfläche).
 
 NX-037 ergänzt eine **Offline-Desktop-Demo** mit PySide6: Übersicht, Einrichtung,
 Geräte, Ressourcenentwurf und simulierter Sitzungsablauf. Dunkelblau, eckige

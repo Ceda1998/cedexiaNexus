@@ -112,3 +112,25 @@ Security-Review nötig, einschließlich Authentisierung, Transportverschlüsselu
 Ressourcenlimits und Datenvertraulichkeit. Ein Tunnel allein macht den
 experimentellen Backend-Code nicht produktionssicher. Es gibt bisher keine
 validierten Aussagen über Produktionssicherheit oder Inferenzleistung.
+
+## Lokale Befehle · NX-067
+
+Auf ausdrücklichen Nutzerauftrag kann die Desktop-App lokale Shellbefehle
+starten. Der gemeinsame Freigabepfad umfasst Terminal, MCP-Verbindungsstart
+(einschließlich stdio-Kindprozess) und MCP-Werkzeugaufruf. Standard ist die
+Einzelfreigabe; „Aus“ verweigert und „Auto“ verzichtet bewusst auf Rückfragen.
+Die optionale lokale Modellprüfung verweigert bei ungültigem Urteil,
+Abbruch, Modellfehler oder geändertem Chat/Freigabemodus. Beschreibungen und
+Argumente sind nicht vertrauenswürdige Eingaben. Ein LLM-Urteil ist keine
+Sicherheitsgarantie und schützt nicht zuverlässig gegen Prompt-Injection.
+Die Stufen ändern keine Betriebssystemberechtigungen. Ein laufender Aufruf
+wird durch einen späteren Moduswechsel nicht rückwirkend zurückgenommen.
+
+Befehle laufen unter dem Benutzerkonto, außerhalb einer Sandbox. Nur bewusst
+vertraute Befehle ausführen; keine automatischen Adminrechte oder Remote-Shells.
+Zeit-/Ausgabelimits und Prozessabbruch begrenzen gewöhnliche Aufrufe, sind aber
+keine Isolation gegen abgekoppelte Prozesse. Terminalausgaben bleiben zunächst
+im Arbeitsspeicher; ihre ausdrückliche Übernahme in den Chat speichert den
+gewählten Text lokal. Dateianhänge werden lokal begrenzt gelesen, ohne externe
+Ressourcen zu laden; Originalpfade und Textauszüge verbleiben in der lokalen
+Chatdatenbank. Weitere Grenzen: [Chat-Arbeitsbereich](chat-workspace.md).

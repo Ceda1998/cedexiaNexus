@@ -58,7 +58,8 @@ def workspace_style(c):
         QWidget#chatMessage[role="user"], QWidget#chatMessage[role="user"] QTextBrowser,
         QTextBrowser#thinkingText {{ background: {c['surface']}; }}
         QWidget#chatMessage[role="user"] {{ border: 1px solid {c['line']}; border-radius: 8px; }}
-        QTextBrowser#thinkingText {{ border-left: 2px solid {c['line']}; }}
+        QTextBrowser#thinkingText {{ border-left: 2px solid {c['line']}; color: {c['muted']}; padding-left: 8px; }}
+        QPushButton#thinkingToggle {{ color: {c['muted']}; }}
         QLineEdit, QPlainTextEdit, QComboBox, QSpinBox {{
             background: {c['surface']}; border: 1px solid {c['line']}; border-radius: 6px;
             min-height: 22px; padding: 5px 8px; selection-background-color: {c['selection']};
@@ -66,9 +67,13 @@ def workspace_style(c):
         }}
         QComboBox {{ padding-right: 22px; }}
         QComboBox QAbstractItemView, QMenu {{
-            background: {c['surface']}; border: 1px solid {c['line']};
+            background: {c['surface']}; color: {c['text']}; border: 1px solid {c['line']};
             selection-background-color: {c['selection']}; selection-color: {c['selected_text']};
         }}
+        QComboBox QAbstractItemView::item {{ min-height: 28px; padding: 4px 8px; }}
+        QComboBox QAbstractItemView::item:selected {{ background: {c['accent']}; color: white; }}
+        QComboBox::drop-down {{ width: 22px; border-left: 1px solid {c['line']}; }}
+        QComboBox:disabled, QLineEdit:disabled, QSpinBox:disabled {{ color: {c['disabled']}; }}
         QMenu::item {{ padding: 5px 18px; }}
         QMenu::item:selected {{ background: {c['selection']}; color: {c['selected_text']}; }}
         QLineEdit:focus, QPlainTextEdit:focus, QComboBox:focus, QSpinBox:focus {{ border: 1px solid {c['focus']}; }}

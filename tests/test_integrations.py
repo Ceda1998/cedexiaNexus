@@ -77,6 +77,9 @@ class IntegrationTests(unittest.TestCase):
             panel.connection.queue.put.assert_not_called()
             integrations.activate(chat[0], 'mcps', identifier, True)
             panel.call_tool()
+            panel.connection.queue.put.assert_not_called()
+            panel.authorize = lambda request, done: done(True)
+            panel.call_tool()
             panel.connection.queue.put.assert_called_once_with(('echo', {}))
             panel.result('echo', 'Werkzeugantwort', False)
             contexts = []
