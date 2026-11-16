@@ -66,7 +66,11 @@ Zwischenablageverlauf kann kopierte Inhalte länger behalten.
 
 **Gemeinsames Rechnen aktivieren** auf beiden aktualisierten Apps erweitert
 die gekoppelte Sitzung ausdrücklich um Inferenz. Ein GPU-Kurztest verwendet
-synthetische Eingaben. Die App tauscht Runtime-Revision, GPU-Name, gemeldeten
+synthetische Eingaben. Ab 0.1.72 bestätigt TLS-ALPN vorab die Unterstützung des Rechenprotokolls;
+bei älteren Peers bleibt nur der Gewichte-Abgleich freigegeben. Ungültige
+Rechennachrichten werden nicht ausgeführt und widerrufen die Rechenfreigabe,
+ohne den unabhängigen Kopplungskanal abzubauen.
+Die App tauscht Runtime-Revision, GPU-Name, gemeldeten
 freien Speicher und die gemessene Kurztest-Tokenrate aus. Keine Hardware-
 Seriennummern, Rechnernamen oder lokalen Modellpfade werden übertragen.
 

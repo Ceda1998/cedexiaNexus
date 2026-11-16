@@ -58,6 +58,7 @@ except ModuleNotFoundError as exc:
 if Tunnel:
     class FakePairing(QObject):
         compute_message = Signal(dict)
+        compute_rejected = Signal(str)
         state_changed = Signal()
 
         def __init__(self):
@@ -68,6 +69,7 @@ if Tunnel:
             self.peer_model = dict(self.local_model)
             self.thread = self
             self.local_address = self.peer_address = '127.0.0.1'
+            self.compute_compatible = True
             self.sent = []
 
         def send(self, message):
@@ -103,6 +105,7 @@ class ComputeQtTests(unittest.TestCase):
         runner, pairing = FixtureRunner(), FakePairing()
         cluster = DistributedSession(runner, pairing)
         cluster.enabled = True
+        cluster.prepared = True
         cluster.digest = 'a' * 64
         cluster.profile = profile()
         cluster.peer = dict(profile=profile())
@@ -248,3 +251,116 @@ class ComputeQtTests(unittest.TestCase):
             stop.set()
             echo_thread.join(timeout=2)
             listener.close()
+
+@unittest.skipIf(Tunnel is None, 'Install requirements-ui.txt')
+class PairedWorkspaceTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        make_application()
+
+    wait = ComputeQtTests.wait
+
+    # Exercise the actual control channel and workspace signals, not FakePairing.
+    def pair_workspaces(self, legacy=False):
+        from contextlib import nullcontext
+        import struct
+        import sys
+        from pathlib import Path
+        from tempfile import TemporaryDirectory
+        from PySide6.QtCore import QSettings
+        from nexus_ui.workspace import Workspace
+        from nexus_ui.pairing_transport import PairingThread
+        root = Path(self.enterContext(TemporaryDirectory()))
+        self.enterContext(patch('nexus_ui.pairing_transport.LAN_NETWORKS', (ipaddress.ip_network('127.0.0.0/8'),)))
+        model = root / 'test.gguf'
+        model.write_bytes(struct.pack('<4sIQQ', b'GGUF', 3, 1, 0) + bytes(128))
+        windows = []
+        for i in range(2):
+            settings = QSettings(str(root / f'{i}.ini'), QSettings.Format.IniFormat)
+            with patch('nexus_ui.local_model.QSettings', return_value=settings):
+                runner = FixtureRunner()
+            runner.select_model(model)
+            window = Workspace(runner, root / f'{i}.db')
+            windows.append(window)
+            window.multi_mode.setChecked(True)
+            window.prompt.setPlainText('Test')
+        def close():
+            for window in windows:
+                window.close()
+            self.wait(lambda: all(not w.pairing.busy and not w.cluster.busy for w in windows))
+        self.addCleanup(close)
+        host, peer = [w.pairing for w in windows]
+        offered = []
+        thread = PairingThread(address='127.0.0.1', parent=host)
+        thread.invitation.connect(offered.append)
+        def old_context(server):
+            from OpenSSL import SSL
+            context = SSL.Context(SSL.TLS_SERVER_METHOD if server else SSL.TLS_CLIENT_METHOD)
+            context.set_min_proto_version(SSL.TLS1_3_VERSION)
+            context.set_options(SSL.OP_NO_TICKET)
+            return context
+        host_patch = patch('nexus_ui.pairing_transport.tls_context', side_effect=old_context) if legacy == 'server' else nullcontext()
+        with host_patch:
+            host.begin(thread, True)
+            self.wait(lambda: bool(offered))
+        if legacy is True:
+            self.enterContext(patch('nexus_ui.pairing_transport.tls_context', side_effect=old_context))
+        peer.begin(PairingThread(code=offered[0], source_address='127.0.0.1', parent=peer), False)
+        try:
+            self.wait(lambda: all(w.cluster.matches() for w in windows))
+        except AssertionError:
+            self.fail(str([(w.pairing.connected, w.pairing.status.text(),
+                            w.pairing.local_model['state'], (w.pairing.peer_model or {}).get('state')) for w in windows]))
+        return windows
+
+    def test_legacy_peer_keeps_pairing_and_shows_update_before_activation(self):
+        windows = self.pair_workspaces(legacy=True)
+        for window in windows:
+            self.assertFalse(window.cluster.compatible)
+            window.compute_enable.click()
+            self.assertFalse(window.cluster.enabled)
+            self.assertFalse(window.cluster.processes)
+            self.assertFalse(window.send.isEnabled())
+            self.assertIn('CN-VERSION', window.device_chat_hint.text())
+        self.assertTrue(all(w.pairing.connected and w.pairing.thread.isRunning() for w in windows))
+
+    def test_legacy_host_also_keeps_weight_comparison(self):
+        windows = self.pair_workspaces(legacy='server')
+        self.assertTrue(all(w.cluster.matches() and not w.cluster.compatible for w in windows))
+        for window in windows:
+            window.compute_enable.click()
+            self.assertFalse(window.cluster.enabled)
+            self.assertIn('CN-VERSION', window.device_chat_hint.text())
+
+    def test_sequential_activation_enables_send_and_rejected_compute_preserves_pair(self):
+        import sys
+        from pathlib import Path
+        from types import SimpleNamespace
+        windows = self.pair_workspaces()
+        for i, window in enumerate(windows):
+            cluster = window.cluster
+            self.assertTrue(cluster.compatible)
+            self.enterContext(patch.object(cluster, 'runtime_file', return_value=Path(sys.executable)))
+            # Only GPU subprocesses are substituted; real TLS, validation, UI
+            # state, model hashing and compute messages stay on the real path.
+            self.enterContext(patch.object(cluster, 'process', return_value=None))
+            window.compute_enable.click()
+            self.assertTrue(cluster.enabled)
+            cluster.profile = profile(device='MTL0' if i == 0 else 'CUDA0')
+            cluster.server = SimpleNamespace(allow=lambda: None, revoke=lambda: None)
+            cluster.advertise(make_invitation('127.0.0.1', 1234, b'a' * 32, b'b' * 32))
+            if i == 0:
+                self.wait(lambda: windows[1].cluster.peer is not None)
+                self.assertFalse(window.send.isEnabled())
+                self.assertIn('zweiten Gerät', window.device_chat_hint.text())
+        self.wait(lambda: all(w.send.isEnabled() for w in windows))
+        self.assertTrue(all(w.pairing.connected for w in windows))
+        # Bypass send-side validation to emulate a malformed/mismatched peer.
+        windows[0].pairing.thread.outgoing.put({'type': 'compute', 'action': 'ready', 'revision': 'wrong'})
+        self.wait(lambda: not windows[1].cluster.enabled)
+        self.assertIn('CN-COMPUTE', windows[1].compute_status.text())
+        self.assertTrue(all(w.pairing.connected and w.pairing.thread.isRunning() for w in windows))
+        self.assertFalse(windows[1].send.isEnabled())
+        message = dict(windows[0].pairing.local_model)
+        windows[0].pairing.thread.send(message)
+        self.wait(lambda: windows[1].pairing.peer_model == message)

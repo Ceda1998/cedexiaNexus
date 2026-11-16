@@ -210,6 +210,7 @@ class Workspace(QMainWindow):
         self.compute_enable = QPushButton('Gemeinsames Rechnen aktivieren')
         self.compute_enable.clicked.connect(self.cluster.enable)
         self.compute_disable = QPushButton('Gemeinsames Rechnen beenden')
+        self.compute_disable.setEnabled(False)
         self.compute_disable.clicked.connect(lambda: self.cluster.disable())
         for widget in (self.compute_hint, self.compute_status, self.compute_enable, self.compute_disable):
             self.pairing.layout().addWidget(widget)
@@ -359,9 +360,7 @@ class Workspace(QMainWindow):
     def device_mode_status(self):
         if self.cluster.ready:
             return 'Beide Geräte bereit · Lastverteilung automatisch'
-        if self.pairing.connected:
-            return 'Geräte verbunden · Modellabgleich im Gerätefenster'
-        return 'Gerätemodus · Verbinde ein Gerät, um die Modelle abzugleichen.'
+        return self.cluster.blocked_reason()
 
     def open_devices(self):
         if not self.pairing.busy:
@@ -377,7 +376,7 @@ class Workspace(QMainWindow):
             if self.multi_mode.isChecked():
                 self.status.setText(self.device_mode_status())
         if self.was_connected and not connected and self.multi_mode.isChecked():
-            self.status.setText('Geräteverbindung beendet.')
+            self.status.setText(self.device_mode_status())
         self.was_connected = connected
 
     def submit(self):
@@ -460,20 +459,22 @@ class Workspace(QMainWindow):
         self.prompt.setReadOnly(busy)
         self.prompt.setPlaceholderText('Nachricht schreiben …')
         self.device_chat_hint.setText('Automatische Lastverteilung · beide Geräte rechnen.' if self.cluster.ready
-                                     else self.cluster.message)
+                                     else self.cluster.blocked_reason())
         can_send = (not busy and (local or self.cluster.ready)
                     and bool(self.prompt.toPlainText().strip()) and not self.runner.unavailable_reason())
         self.send.setEnabled(can_send)
-        self.send.setToolTip('' if local or self.cluster.ready else 'Gemeinsames Rechnen auf beiden Geräten aktivieren.')
+        self.send.setToolTip(self.runner.unavailable_reason() if local else self.cluster.blocked_reason())
         self.stop.setVisible(busy)
         self.send.setVisible(not busy)
 
     def compute_changed(self):
-        self.compute_status.setText(self.cluster.message)
+        self.compute_status.setText(self.cluster.message if self.cluster.ready else self.cluster.blocked_reason())
         self.compute_enable.setEnabled(not self.cluster.enabled and not self.cluster.busy and not self.runner.busy)
         self.compute_disable.setEnabled(self.cluster.enabled)
         self.runner.busy_changed.emit(self.runner.busy or self.runner.external_busy)
         self.refresh()
+        if self.multi_mode.isChecked() and not self.runner.busy:
+            self.status.setText(self.device_mode_status())
         self.finish_close()
 
     def stop_run(self):

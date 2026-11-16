@@ -91,6 +91,7 @@ def compare_models(local, peer):
 class DevicePairingPage(QWidget):
     idle = Signal()
     compute_message = Signal(dict)
+    compute_rejected = Signal(str)
     state_changed = Signal()
     discovery_failure = "Geräteerkennung fehlgeschlagen. Prüfe das lokale Netzwerk oder verwende einen Einladungscode."
 
@@ -108,6 +109,7 @@ class DevicePairingPage(QWidget):
         self.approval_sent = False
         self.hosting = False
         self.connected = False
+        self.connection_failure = ''
         self.local_model = MISSING_MODEL
         self.peer_model = None
         self.received_source = ""
@@ -390,6 +392,7 @@ class DevicePairingPage(QWidget):
         self.begin(thread, hosting=False)
 
     def begin(self, thread, hosting, status=None):
+        self.connection_failure = ''
         self.thread = thread
         self.hosting = hosting
         self.status.setText(status or ("Einladung wird erstellt …" if hosting else "Verbindung wird aufgebaut …"))
@@ -399,6 +402,7 @@ class DevicePairingPage(QWidget):
         thread.approval_ended.connect(self.hide_approval)
         thread.connected.connect(self.peer_connected)
         thread.message.connect(self.receive_message)
+        thread.compute_rejected.connect(self.compute_rejected)
         thread.ended.connect(self.show_session_end)
         thread.finished.connect(self.session_finished)
         self.code.clear()
@@ -439,6 +443,7 @@ class DevicePairingPage(QWidget):
         self.check_model()
 
     def show_session_end(self, status):
+        self.connection_failure = status
         if self.pending_peer is None and self.status.text() != self.discovery_failure:
             self.status.setText(status)
 

@@ -21,6 +21,7 @@ class DistributedSession(QObject):
         self.processes = set()
         self.threads = set()
         self.enabled = False
+        self.prepared = False
         self.pending = self.reservation = None
         self.launched = False
         self.graphs = self.peer_graphs = 0
@@ -37,6 +38,7 @@ class DistributedSession(QObject):
         self.activity_timer.timeout.connect(self.publish_activity)
         self.activity_timer.start()
         pairing.compute_message.connect(self.receive)
+        pairing.compute_rejected.connect(self.disable)
         pairing.state_changed.connect(self.check_state)
         runner.finished.connect(self.run_finished)
         runner.model_changed.connect(lambda: self.disable('Modell geändert; gemeinsam neu vorbereiten.'))
@@ -47,14 +49,39 @@ class DistributedSession(QObject):
 
     @property
     def ready(self):
-        return bool(self.enabled and self.server and self.peer and self.profile and self.matches()
+        return bool(self.compatible and self.prepared and self.enabled and self.server and self.peer and self.profile and self.matches()
                     and not self.pending and not self.reservation and not self.runner.busy)
+
+    @property
+    def compatible(self):
+        return bool(self.pairing.connected and self.pairing.thread
+                    and self.pairing.thread.compute_compatible)
+
+    def blocked_reason(self):
+        if not self.pairing.connected:
+            return (getattr(self.pairing, 'connection_failure', '') or
+                    'Kein Gerät verbunden. Geräte verbinden und Gewichte abgleichen.')
+        if not self.compatible:
+            return ('CN-VERSION: Die Gegenstelle bestätigt das Rechenprotokoll nicht. '
+                    'Beide Apps auf mindestens 0.1.72 aktualisieren und neu koppeln. '
+                    'Der Gewichte-Abgleich bleibt verfügbar.')
+        if not self.matches():
+            return 'Die GGUF-Gewichte müssen auf beiden Geräten fertig geprüft und identisch sein.'
+        if not self.enabled:
+            return self.message + ' Hier im Gerätefenster gemeinsames Rechnen aktivieren.'
+        if not self.prepared:
+            return 'Dieses Gerät wird vorbereitet. ' + self.message
+        if self.pending or self.reservation:
+            return self.message
+        if not self.peer:
+            return 'Dieses Gerät ist bereit. Auf dem zweiten Gerät gemeinsames Rechnen aktivieren und den GPU-Test abwarten.'
+        return ''
 
     def matches(self):
         return self.pairing.connected and self.pairing.peer_model and same_weights(self.pairing.local_model, self.pairing.peer_model)
 
     def tell(self, action, **fields):
-        if self.pairing.connected and self.pairing.thread:
+        if self.compatible:
             self.pairing.thread.send({'type': 'compute', 'action': action, **fields})
 
     def status(self, text):
@@ -66,6 +93,7 @@ class DistributedSession(QObject):
             self.peer = None
         if self.enabled and (not self.matches() or self.pairing.local_model.get('sha256') != self.digest):
             self.disable('Gewichte oder Verbindung geändert; gemeinsames Rechnen erneut aktivieren.')
+        self.changed.emit()
 
     def runtime_file(self, name):
         return self.runner.runtime.with_name(name + ('.exe' if self.runner.windows else ''))
@@ -117,10 +145,14 @@ class DistributedSession(QObject):
         if not self.matches():
             self.status('Zuerst beide Geräte verbinden und identische GGUF-Gewichte prüfen.')
             return
+        if not self.compatible:
+            self.status(self.blocked_reason())
+            return
         if not all(self.runtime_file(name).is_file() for name in ('llama-completion', 'llama-bench', 'ggml-rpc-server')):
             self.status('RPC-Runtime fehlt. Auf beiden Geräten den aktuellen Installer installieren.')
             return
         self.enabled = True
+        self.prepared = False
         self.digest = self.pairing.local_model['sha256']
         self.runner.external_busy = True
         self.status('GPU und Runtime werden geprüft …')
@@ -235,6 +267,7 @@ class DistributedSession(QObject):
         if not self.enabled:
             return
         self.runner.external_busy = False
+        self.prepared = True
         self.tell('ready', profile=self.profile, code=code, sha256=self.digest, revision=REVISION)
         self.status(self.profile_text())
 
@@ -247,6 +280,9 @@ class DistributedSession(QObject):
         return f"Hier: {describe(self.profile)}\nZweites Gerät: {describe(self.peer['profile'] if self.peer else None)}"
 
     def receive(self, message):
+        if not self.compatible:
+            self.status(self.blocked_reason())
+            return
         action = message['action']
         if action == 'ready':
             from .pairing_transport import read_invitation
@@ -351,6 +387,7 @@ class DistributedSession(QObject):
     def disable(self, reason='Gemeinsames Rechnen deaktiviert.'):
         was_enabled = self.enabled
         self.enabled = False
+        self.prepared = False
         self.cancel(reason)
         if was_enabled:
             self.tell('off')

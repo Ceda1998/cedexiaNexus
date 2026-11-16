@@ -7,8 +7,11 @@ Der Rechner mit dem geöffneten Chat koordiniert; er muss nicht der stärkere se
 
 ## Bedienung
 
-1. Auf **beiden** Geräten Version 0.1.71 oder neuer installieren. Ältere Apps
-   unterstützen die neuen Rechennachrichten nicht und können die Verbindung beenden.
+1. Auf **beiden** Geräten Version 0.1.72 oder neuer installieren und neu koppeln.
+   Ab 0.1.72 wird die Rechenfähigkeit vorab innerhalb der TLS-Verbindung über
+   ALPN ausgehandelt. Mit älteren Apps bleibt der Gewichte-Abgleich möglich;
+   gemeinsame Inferenz wird mit einem Updatehinweis gesperrt. Dies betrifft auch
+   0.1.71, deren TLS-Aushandlung die neue Bereitschaftsprüfung noch nicht kennt.
 2. Dasselbe GGUF auswählen, über LAN oder WLAN koppeln und den bestätigten
    Gewichte-Abgleich abwarten. Modelle während des Laufs nicht extern ersetzen.
 3. Auf beiden Geräten im Gerätefenster **Gemeinsames Rechnen aktivieren** wählen.
@@ -78,3 +81,32 @@ stehen, nach dem Lauf eine positive Worker-Graphzahl und in der Antwort der
 Schichtplan. Anschließend kann Qwen aus dem ursprünglichen Prototypziel geprüft
 werden. Fehlschläge mit UI-Fehlerklasse, Modellname und bereinigtem Schichtplan
 dokumentieren; keine IPs, Pfade oder Runtime-Rohlogs veröffentlichen.
+
+## Fehler beim Aktivieren (0.1.72)
+
+Eine abgelehnte Rechennachricht beendet jetzt die Rechenfreigabe, aber nicht
+die bestätigte Gerätekopplung. Chat und Gerätefenster zeigen konkret, ob das
+lokale Gerät noch vorbereitet wird, die Freigabe am zweiten Gerät fehlt oder
+die Protokollbestätigung fehlt. Gewichte-Gleichheit allein gibt Senden nicht frei.
+
+Bei einer tatsächlichen Trennung bleibt eine bereinigte Fehlerklasse im Chat
+und Gerätefenster sichtbar:
+
+- `CN-VERSION`: Rechenprotokoll nicht bestätigt; beide Apps aktualisieren und neu koppeln.
+- `CN-COMPUTE`: Rechennachricht abgelehnt; Kopplung bleibt bestehen.
+- `CN-PROTOKOLL`: Ungültige Nachricht im Kopplungskanal.
+- `CN-PEER`: Gegenstelle hat die TLS-Sitzung geschlossen.
+- `CN-TLS`: TLS-Transport unterbrochen.
+- `CN-NETZ`: Netzwerkverbindung geschlossen oder unterbrochen.
+- `CN-TIMEOUT`: Zeitlimit beim Kontakt mit der Gegenstelle.
+
+Diese Kategorien sind keine Rohlogs und enthalten keine privaten Endpunkte.
+Ein `CN-TLS`-Fehler beweist allein weder eine Firewallursache noch einen
+Zertifikatfehler. Die neue Version behebt die Kopplungsunterbrechung durch
+ungültige Rechennachrichten und macht übrige Abbruchfälle unterscheidbar.
+
+Der gemeldete physische Abbruch von 0.1.71 zwischen Mac und Windows ließ sich
+lokal nicht reproduzieren. Zwei echte Workspaces mit echtem Kontrollkanal,
+Gewichte-Abgleich und Ministral-Inferenz auf einem Mac bestanden. Die vorherige
+Annahme einer Windows-Version 0.1.70 wurde vom Nutzer korrigiert und ist keine
+belegte Fehlerursache. Die Zielgeräte-Abnahme bleibt offen.

@@ -1,3 +1,9 @@
+**0.1.72 · Rechenfreigabe und Verbindungsdiagnose**
+
+Beide Geräte aktualisieren und neu koppeln. Die Rechenfähigkeit wird jetzt vor der Aktivierung innerhalb von TLS ausgehandelt. Ein älterer Peer bleibt für den Gewichte-Abgleich verbunden und erhält auf der neuen App einen klaren Updatehinweis. Abgelehnte Rechennachrichten beenden die Rechenfreigabe, nicht die Kopplung. Chat und Gerätefenster zeigen, welches Gerät noch nicht bereit ist; echte Verbindungsabbrüche erhalten bereinigte Fehlercodes.
+
+Der konkret gemeldete Mac-/Windows-Abbruch in 0.1.71 ist lokal noch nicht reproduziert. Der vollständige Zwei-Workspace-Ablauf über echte Kopplung ist auf einem Mac geprüft; die physische CUDA-/Metal-Abnahme bleibt offen.
+
 Geführte Installation von Cedexia Nexus mit Python, Qt und llama.cpp. Keine GGUF-Gewichte enthalten, keine Downloads während der Installation.
 
 Einzelgerät und Mehrgeräte sind direkt in der Seitenleiste sichtbar. Für die Kopplung zeigt WLAN nur WLAN-Adapter sowie den verbundenen Netzwerknamen, wenn das Betriebssystem ihn freigibt. Scrollleisten sind im dunklen Design besser erkennbar.

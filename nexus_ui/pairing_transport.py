@@ -30,6 +30,7 @@ HANDSHAKE_SECONDS = 8
 APPROVAL_SECONDS = 45
 INVITE_SECONDS = 300
 SESSION_SECONDS = 7200
+COMPUTE_PROTOCOL = b'cedexia-compute/1'
 PEER_ERRORS = (OSError, SSL.Error, ValueError, RecursionError)
 
 
@@ -59,6 +60,14 @@ def tls_context(server):
     context = SSL.Context(SSL.TLS_SERVER_METHOD if server else SSL.TLS_CLIENT_METHOD)
     context.set_min_proto_version(SSL.TLS1_3_VERSION)
     context.set_options(SSL.OP_NO_TICKET)
+    # ALPN is negotiated inside TLS, before any application messages. Older
+    # peers can still pair without receiving a message they cannot understand.
+    if server:
+        context.set_alpn_select_callback(
+            lambda _connection, offered: COMPUTE_PROTOCOL if COMPUTE_PROTOCOL in offered
+            else SSL.NO_OVERLAPPING_PROTOCOLS)
+    else:
+        context.set_alpn_protos([COMPUTE_PROTOCOL])
     return context
 
 
@@ -174,6 +183,7 @@ class PairingThread(QThread):
     connected = Signal()
     message = Signal(dict)
     ended = Signal(str)
+    compute_rejected = Signal(str)
 
     def __init__(self, *, address=None, code=None, source_address=None,
                  discovery_network=None, discovered_peer=None, parent=None):
@@ -188,6 +198,7 @@ class PairingThread(QThread):
         self.approval = Queue(maxsize=1)
         self.outgoing = Queue()
         self.joined = False
+        self.compute_compatible = False
 
     @property
     def uses_discovery(self):
@@ -249,9 +260,19 @@ class PairingThread(QThread):
                 self.host()
             else:
                 self.join()
-        except PEER_ERRORS:
+        except PEER_ERRORS as error:
             if self.joined:
-                status = "Verbindung zum anderen Gerät beendet."
+                if isinstance(error, ValueError):
+                    detail = 'CN-PROTOKOLL: Ungültige Kopplungsnachricht. Beide Apps aktualisieren.'
+                elif isinstance(error, TimeoutError):
+                    detail = 'CN-TIMEOUT: Die Gegenstelle antwortet nicht rechtzeitig.'
+                elif isinstance(error, SSL.ZeroReturnError):
+                    detail = 'CN-PEER: Die Gegenstelle hat die TLS-Sitzung geschlossen.'
+                elif isinstance(error, SSL.Error):
+                    detail = 'CN-TLS: Der verschlüsselte Transport wurde unterbrochen.'
+                else:
+                    detail = 'CN-NETZ: Die Netzwerkverbindung wurde geschlossen oder unterbrochen.'
+                status = 'Verbindung zum anderen Gerät beendet. ' + detail
             elif self.target is not None and self.target[3] is None:
                 status = "Kopplungsanfrage fehlgeschlagen, abgelehnt oder abgelaufen."
             elif self.discovery_network is not None:
@@ -339,6 +360,7 @@ class PairingThread(QThread):
     def exchange(self, channel):
         self.local_address = channel.raw.getsockname()[0]
         self.peer_address = channel.raw.getpeername()[0]
+        self.compute_compatible = channel.tls.get_alpn_proto_negotiated() == COMPUTE_PROTOCOL
         self.joined = True
         self.connected.emit()
         expires = time.monotonic() + SESSION_SECONDS
@@ -353,7 +375,15 @@ class PairingThread(QThread):
                 incoming = channel.receive(time.monotonic() + 0.2)
             except TimeoutError:
                 continue
-            validate_message(incoming)
+            try:
+                validate_message(incoming)
+            except (ValueError, TypeError):
+                if isinstance(incoming, dict) and incoming.get('type') == 'compute':
+                    self.compute_rejected.emit('CN-COMPUTE: Rechennachricht abgelehnt. '
+                                               'Beide Apps aktualisieren und Rechnen erneut aktivieren. '
+                                               'Die Gerätekopplung bleibt bestehen.')
+                    continue
+                raise ValueError('Invalid pairing message') from None
             if incoming["type"] == "source" and self.can_offer:
                 raise ValueError("Only the inviting device can share a source.")
             self.message.emit(incoming)
