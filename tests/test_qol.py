@@ -10,7 +10,6 @@ from unittest.mock import patch
 
 try:
     from PySide6.QtCore import QSettings, Qt
-    from PySide6.QtGui import QPdfWriter, QPainter
     from PySide6.QtTest import QTest
     from PySide6.QtWidgets import QApplication, QMessageBox
     from nexus_ui.app import make_application
@@ -98,11 +97,23 @@ class QualityOfLifeTests(unittest.TestCase):
         file.write_text('Attachment fact: the restaurant is called Linden.', encoding='utf-8')
         item = read_attachment(file)
         pdf = self.root / 'document.pdf'
-        writer = QPdfWriter(str(pdf))
-        painter = QPainter(writer)
-        painter.drawText(100, 1000, 'PDF attachment fact')
-        painter.end()
-        del writer
+        # Fixed standard-font PDF avoids OS-dependent font embedding by QPdfWriter.
+        content = b'BT /F1 12 Tf 72 720 Td (PDF attachment fact) Tj ET'
+        objects = [b'<< /Type /Catalog /Pages 2 0 R >>',
+                   b'<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
+                   b'<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>',
+                   b'<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>',
+                   b'<< /Length ' + str(len(content)).encode() + b' >>\nstream\n' + content + b'\nendstream']
+        data, offsets = bytearray(b'%PDF-1.4\n'), [0]
+        for index, obj in enumerate(objects, 1):
+            offsets.append(len(data))
+            data.extend(str(index).encode() + b' 0 obj\n' + obj + b'\nendobj\n')
+        xref = len(data)
+        data.extend(b'xref\n0 6\n0000000000 65535 f \n')
+        for offset in offsets[1:]:
+            data.extend(f'{offset:010d} 00000 n \n'.encode())
+        data.extend(f'trailer\n<< /Size 6 /Root 1 0 R >>\nstartxref\n{xref}\n%%EOF\n'.encode())
+        pdf.write_bytes(data)
         self.assertIn('PDF attachment fact', read_attachment(pdf)['text'])
         image = self.root / 'example.png'
         image.write_bytes(b'not a decoded image')
@@ -192,10 +203,10 @@ class QualityOfLifeTests(unittest.TestCase):
         row.copy_reply.click()
         self.assertEqual(QApplication.clipboard().text(), 'Final')
         w.toggle_sidebar()
-        QTest.qWait(230)
+        self.wait_until(lambda: w.sidebar.width() == 0)
         self.assertEqual(w.sidebar.width(), 0)
         w.toggle_sidebar()
-        QTest.qWait(230)
+        self.wait_until(lambda: w.sidebar.width() == 230)
         self.assertEqual(w.sidebar.width(), 230)
         w.language.setCurrentIndex(w.language.findData('de'))
         self.assertEqual(w.send.text(), 'Senden')
