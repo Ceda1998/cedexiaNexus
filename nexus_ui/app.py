@@ -391,5 +391,15 @@ def main(smoke=False):
         print(json.dumps(build_info()), flush=True)
     window.show()
     if smoke:
-        QTimer.singleShot(100, app.quit)
+        def check_settings():
+            try:
+                window.open_settings()
+                assert window.settings_navigation.count() == 7
+                assert window.language.count() == 2
+                window.preferences.close()
+            except Exception:
+                app.exit(1)
+                return
+            QTimer.singleShot(200, app.quit)
+        QTimer.singleShot(50, check_settings)
     sys.exit(app.exec())

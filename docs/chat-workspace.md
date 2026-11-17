@@ -90,3 +90,15 @@ lieferte getrennten Denktext und die finale Antwort „OK“, vollständigen
 Endmarker und Exit-Code 0. Sichtprüfung des dunklen Chats bestätigte Icons,
 zugeklapptes Thinking und lesbaren ausgeklappten Denktext. Physische
 Windows-UI-/GPU- und Zwei-Geräte-Abnahme bleiben gesonderte Nachweise.
+
+## Native Nachprüfung · 0.1.74
+
+Bei der tatsächlichen Mac-Prüfung mit vorhandenen Chats und aktivem
+Accessibility-Zugriff stürzte 0.1.73 beim Öffnen der Einstellungen im
+Cocoa-Plugin ab. Ein leerer Testchat reproduzierte das nicht. Das
+Einstellungsfenster übernimmt jetzt das vorhandene Stylesheet, ohne den
+bestehenden Chat beim Öffnen global neu zu formatieren. Mit derselben isolierten
+Kopie der vorhandenen Chats blieb der native Dialog danach stabil. Der
+Paket-Smoke-Test öffnet ebenfalls die Einstellungen; Dropdown-Views werden
+nicht mehr unnötig ersetzt. Das ist kein allgemeiner Nachweis für alle
+Screenreader-/Accessibility-Flüsse.

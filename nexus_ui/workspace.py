@@ -12,7 +12,7 @@ from PySide6.QtGui import QDesktopServices, QPalette, QColor
 from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QPushButton, QLabel, QComboBox, QTreeWidget, QTreeWidgetItem, QPlainTextEdit,
     QDialog, QListWidget, QStackedWidget, QFormLayout, QSpinBox, QCheckBox, QButtonGroup,
-    QInputDialog, QMessageBox, QMenu, QScrollArea, QFileDialog, QListView)
+    QInputDialog, QMessageBox, QMenu, QScrollArea, QFileDialog)
 
 from .attachments import AttachmentReader, attachment_context
 from .command_access import MODES, TerminalDialog, review_prompt, review_allows
@@ -631,9 +631,6 @@ class Workspace(QMainWindow):
         palette.setColor(QPalette.ColorGroup.Disabled, QPalette.ColorRole.Text, QColor(colors['disabled']))
         self.setPalette(palette)
         for combo in self.findChildren(QComboBox):
-            if not combo.property('nexusPopup'):
-                combo.setView(QListView(combo))
-                combo.setProperty('nexusPopup', True)
             combo.setPalette(palette)
             combo.view().setPalette(palette)
         arrow = self.icon_cache.path() + ('/arrow-dark.png' if dark else '/arrow-light.png')
@@ -741,7 +738,6 @@ class Workspace(QMainWindow):
             matches = self.settings_navigation.findItems(section, Qt.MatchFlag.MatchExactly)
             if matches:
                 self.settings_navigation.setCurrentItem(matches[0])
-        self.apply_theme()
         self.preferences.show()
         self.preferences.raise_()
         if section == 'Skills':

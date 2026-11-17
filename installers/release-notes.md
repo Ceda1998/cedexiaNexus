@@ -1,4 +1,10 @@
-**0.1.73 · Chatkomfort, Anhänge und Befehlsfreigaben**
+**0.1.74 · Chatkomfort, Anhänge und Befehlsfreigaben**
+
+Zusätzlich zu 0.1.73: Das Einstellungsfenster übernimmt das vorhandene Design,
+ohne bestehende Chatnachrichten global neu zu formatieren. Das behebt den
+beobachteten Cocoa-Absturz beim Öffnen mit vorhandenen Chats. Dropdown-Ansichten
+werden ebenfalls nicht mehr unnötig ersetzt. Der Paket-Smoke-Test öffnet nun
+auch das Einstellungsfenster.
 
 Projekte mit ihren Chats löschen, neuer Chat per Icon, animierte Sidebar,
 Standardmodell und Allgemein-Einstellungen mit Version sowie Deutsch/Englisch.
